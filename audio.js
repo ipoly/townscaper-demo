@@ -8,13 +8,22 @@ export class Sfx {
     this.ctx = null;
     this.muted = false;
     this.lastPop = 0;
+    // Go fully silent while the page is hidden (other app, locked screen, background tab)
+    const sync = () => {
+      if (!this.ctx) return;
+      if (document.hidden) this.ctx.suspend();
+      else this.ctx.resume();
+    };
+    document.addEventListener('visibilitychange', sync);
+    addEventListener('pagehide', () => this.ctx?.suspend());
+    addEventListener('pageshow', sync);
   }
 
   // Browsers only allow audio after a user gesture
   ensure() {
     if (this.ctx) {
       // iOS reports 'interrupted' after calls or backgrounding
-      if (this.ctx.state !== 'running') this.ctx.resume();
+      if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume();
       return;
     }
     // Play through the iOS silent switch like media audio instead of ringer-style sounds
