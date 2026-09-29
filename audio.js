@@ -13,10 +13,18 @@ export class Sfx {
   // Browsers only allow audio after a user gesture
   ensure() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') this.ctx.resume();
+      // iOS reports 'interrupted' after calls or backgrounding
+      if (this.ctx.state !== 'running') this.ctx.resume();
       return;
     }
+    // Play through the iOS silent switch like media audio instead of ringer-style sounds
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
     const ctx = (this.ctx = new AudioContext());
+    // A silent buffer started inside the gesture unlocks output on older iOS
+    const src = ctx.createBufferSource();
+    src.buffer = ctx.createBuffer(1, 1, 22050);
+    src.connect(ctx.destination);
+    src.start();
     this.master = ctx.createGain();
     this.master.gain.value = this.muted ? 0 : 1;
     this.master.connect(ctx.destination);

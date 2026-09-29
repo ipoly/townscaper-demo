@@ -27,6 +27,8 @@
     }
     html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
     canvas { display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    /* Long presses on touch screens must not start text selection or the callout menu */
+    body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     /* Touch-only controls and help, shown on devices without a hovering pointer */
     .touch-only { display: none !important; }

@@ -866,8 +866,13 @@ function touchUp(e) {
 }
 
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+// iOS still shows the selection loupe on a long press unless the native touch is cancelled
+renderer.domElement.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+// WebKit only grants audio activation on touchend / click, not on pointerdown
+for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
+  addEventListener(type, () => sfx.ensure(), { capture: true, passive: true });
+}
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  sfx.ensure();
   if (e.pointerType === 'touch') { touchDown(e); return; }
   downAt = [e.clientX, e.clientY];
   if (e.button !== 0) return;
@@ -1044,5 +1049,5 @@ renderer.setAnimationLoop(() => {
 
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
-  undo, redo, setMood, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, get undoDepth() { return undoStack.length; },
+  undo, redo, setMood, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, get undoDepth() { return undoStack.length; },
 };
