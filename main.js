@@ -1047,6 +1047,10 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
   undo, redo, setMood, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, get undoDepth() { return undoStack.length; },
