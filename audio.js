@@ -8,24 +8,29 @@ export class Sfx {
     this.ctx = null;
     this.muted = false;
     this.lastPop = 0;
-    // Go fully silent while the page is hidden (other app, locked screen, background tab)
+    this.unlocked = false;
+    // Go fully silent while the page is hidden (other app, locked screen, background tab).
+    // The context is closed rather than suspended: iOS refuses to resume one outside a gesture
+    // after backgrounding, and sometimes reports it running while it stays silent.
     const sync = () => {
-      if (!this.ctx) return;
-      if (document.hidden) this.ctx.suspend();
-      else this.ctx.resume();
+      if (document.hidden) this.close();
+      else if (this.unlocked && !this.ctx) this.open();
     };
     document.addEventListener('visibilitychange', sync);
-    addEventListener('pagehide', () => this.ctx?.suspend());
+    addEventListener('pagehide', () => this.close());
     addEventListener('pageshow', sync);
   }
 
   // Browsers only allow audio after a user gesture
   ensure() {
-    if (this.ctx) {
-      // iOS reports 'interrupted' after calls or backgrounding
-      if (this.ctx.state !== 'running' && !document.hidden) this.ctx.resume();
-      return;
-    }
+    if (document.hidden) return;
+    this.unlocked = true;
+    if (!this.ctx) this.open();
+    // iOS reports 'interrupted' after calls; a context opened outside a gesture starts suspended
+    else if (this.ctx.state !== 'running') this.ctx.resume();
+  }
+
+  open() {
     // Play through the iOS silent switch like media audio instead of ringer-style sounds
     if (navigator.audioSession) navigator.audioSession.type = 'playback';
     const ctx = (this.ctx = new AudioContext());
@@ -37,7 +42,14 @@ export class Sfx {
     this.master = ctx.createGain();
     this.master.gain.value = this.muted ? 0 : 1;
     this.master.connect(ctx.destination);
+    this.lastPop = 0;
     this.startSurf();
+  }
+
+  close() {
+    if (!this.ctx) return;
+    this.ctx.close();
+    this.ctx = this.master = null;
   }
 
   setMuted(muted) {
