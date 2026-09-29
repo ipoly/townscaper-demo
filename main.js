@@ -37,6 +37,7 @@ sun.shadow.bias = -0.0005;
 scene.add(sun);
 
 const now = () => performance.now() / 1000;
+let lastActive = now(); // last input, camera move or town change
 const uTime = { value: now() };
 const uNight = { value: 0 };
 
@@ -581,7 +582,7 @@ const sfx = new Sfx();
 let pending = [];
 let needsRebuild = false, hoverDirty = false;
 
-function markChanged() { needsRebuild = true; hoverDirty = true; }
+function markChanged() { needsRebuild = true; hoverDirty = true; lastActive = now(); }
 
 function addCell(v, L, color) {
   if (!town.canBuild(v, L) || town.has(v, L)) return false;
@@ -1016,8 +1017,20 @@ addEventListener('resize', () => {
 });
 
 if (!loadFromHash()) newWorld(42, showcaseTown);
+// Ambient motion is slow, so after a few idle seconds 30fps looks the same and saves battery.
+// Any input or camera movement brings back the full frame rate immediately.
+const IDLE_AFTER = 3, IDLE_FRAME = 1 / 30;
+let lastFrame = 0;
+const markActive = () => { lastActive = now(); };
+for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
+  addEventListener(type, markActive, { capture: true, passive: true });
+}
+controls.addEventListener('change', markActive);
 renderer.setAnimationLoop(() => {
   const t = now();
+  // Small slack so a 60Hz display lands on every second frame instead of drifting
+  if (t - lastActive > IDLE_AFTER && t - lastFrame < IDLE_FRAME - 0.004) return;
+  lastFrame = t;
   uTime.value = t;
   controls.update();
   if (needsRebuild) {
@@ -1053,5 +1066,5 @@ if ('serviceWorker' in navigator) {
 
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
-  undo, redo, setMood, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, get undoDepth() { return undoStack.length; },
+  undo, redo, setMood, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
 };
