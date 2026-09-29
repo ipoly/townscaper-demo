@@ -18,6 +18,8 @@ scene.fog = new THREE.Fog('#cfe6ec', 30, 70);
 
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 200);
 camera.position.set(14, 16, 18);
+// Portrait screens see less of the island sideways: start further out
+if (camera.aspect < 1) camera.position.multiplyScalar(Math.min(1.8, 1 / camera.aspect) ** 0.7);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.45;
@@ -768,13 +770,9 @@ function strokeAt(x, y) {
   }
 }
 
-renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-renderer.domElement.addEventListener('pointerdown', (e) => {
-  sfx.ensure();
-  downAt = [e.clientX, e.clientY];
-  if (e.button !== 0) return;
-  const hit = pick(e.clientX, e.clientY);
-  if (e.shiftKey) {
+function beginStroke(x, y, erase) {
+  const hit = pick(x, y);
+  if (erase) {
     if (hit && hit.meta) {
       removeCell(hit.meta.v, hit.meta.L);
       stroke = { mode: 'erase', L: hit.meta.L };
@@ -786,27 +784,114 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
       stroke = { mode: 'build', L: target.L, lastV: target.v };
     }
   }
-  if (stroke) {
-    stroke.last = [e.clientX, e.clientY];
-    renderer.domElement.setPointerCapture(e.pointerId);
+  if (stroke) stroke.last = [x, y];
+  return !!stroke;
+}
+function continueStroke(x, y) {
+  // Sample along the pointer path so fast drags do not skip cells
+  const [lx, ly] = stroke.last;
+  const steps = Math.max(1, Math.ceil(Math.hypot(x - lx, y - ly) / 6));
+  for (let s = 1; s <= steps; s++) strokeAt(lx + ((x - lx) * s) / steps, ly + ((y - ly) * s) / steps);
+  stroke.last = [x, y];
+}
+function endStroke() {
+  if (!stroke) return;
+  stroke = null;
+  commit();
+}
+
+// Touch: tap builds, long press removes, one finger orbits and two fingers pan / zoom.
+// With the brush or eraser tool on, one finger paints instead and two fingers orbit / zoom.
+let touchTool = null; // null | 'brush' | 'erase'
+const touchIds = new Set();
+let touch = null; // { x, y, moved, done, timer } for the single finger down
+function setTouchTool(tool) {
+  touchTool = touchTool === tool ? null : tool;
+  controls.touches = touchTool
+    ? { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE }
+    : { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  for (const [id, t] of [['btn-brush', 'brush'], ['btn-erase', 'erase']]) {
+    const el = document.getElementById(id);
+    el.classList.toggle('on', touchTool === t);
+    el.setAttribute('aria-pressed', touchTool === t);
   }
+}
+setTouchTool(null);
+function cancelTouch() {
+  if (touch) clearTimeout(touch.timer);
+  touch = null;
+}
+function touchDown(e) {
+  touchIds.add(e.pointerId);
+  if (touchIds.size > 1) {
+    // A second finger turns the gesture into camera control
+    cancelTouch();
+    endStroke();
+    return;
+  }
+  touch = { x: e.clientX, y: e.clientY, moved: false, done: false };
+  if (!touchTool) {
+    touch.timer = setTimeout(() => {
+      if (!touch || touch.moved) return;
+      touch.done = true;
+      const hit = pick(touch.x, touch.y);
+      if (hit && hit.meta && removeCell(hit.meta.v, hit.meta.L)) {
+        commit();
+        navigator.vibrate?.(15);
+      }
+    }, 450);
+  }
+}
+function touchMove(e) {
+  if (!touch || touchIds.size > 1) return;
+  if (!touch.moved && Math.hypot(e.clientX - touch.x, e.clientY - touch.y) < 10) return;
+  touch.moved = true;
+  clearTimeout(touch.timer);
+  if (!touchTool) return;
+  // Painting starts where the finger went down, once it is clearly a one-finger drag
+  if (!stroke && !touch.done) {
+    touch.done = true;
+    if (!beginStroke(touch.x, touch.y, touchTool === 'erase')) return;
+    stroke.dragging = true;
+  }
+  if (stroke) continueStroke(e.clientX, e.clientY);
+}
+function touchUp(e) {
+  touchIds.delete(e.pointerId);
+  if (stroke) { endStroke(); return; }
+  if (touch && !touch.moved && !touch.done && e.type === 'pointerup') {
+    if (beginStroke(touch.x, touch.y, touchTool === 'erase')) endStroke();
+  }
+  cancelTouch();
+}
+
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  sfx.ensure();
+  if (e.pointerType === 'touch') { touchDown(e); return; }
+  downAt = [e.clientX, e.clientY];
+  if (e.button !== 0) return;
+  if (beginStroke(e.clientX, e.clientY, e.shiftKey)) renderer.domElement.setPointerCapture(e.pointerId);
 });
 renderer.domElement.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'touch') { touchMove(e); return; }
   lastMove = [e.clientX, e.clientY, e.buttons];
   hoverDirty = true;
   if (!stroke) return;
   // A click that wobbles a few pixels is still a click, not a drag
   if (!stroke.dragging && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 8) return;
   stroke.dragging = true;
-  // Sample along the pointer path so fast drags do not skip cells
-  const [lx, ly] = stroke.last;
-  const steps = Math.max(1, Math.ceil(Math.hypot(e.clientX - lx, e.clientY - ly) / 6));
-  for (let s = 1; s <= steps; s++) strokeAt(lx + ((e.clientX - lx) * s) / steps, ly + ((e.clientY - ly) * s) / steps);
-  stroke.last = [e.clientX, e.clientY];
+  continueStroke(e.clientX, e.clientY);
 });
-renderer.domElement.addEventListener('pointerleave', () => { lastMove = null; setHover(null); });
+renderer.domElement.addEventListener('pointerleave', (e) => {
+  if (e.pointerType === 'touch') return;
+  lastMove = null;
+  setHover(null);
+});
+renderer.domElement.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') touchUp(e); });
 renderer.domElement.addEventListener('pointerup', (e) => {
-  if (stroke) { stroke = null; commit(); return; }
+  if (e.pointerType === 'touch') { touchUp(e); return; }
+  if (stroke) { endStroke(); return; }
   if (e.button !== 2 || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
   const hit = pick(e.clientX, e.clientY);
   if (hit && hit.meta && removeCell(hit.meta.v, hit.meta.L)) commit();
@@ -886,6 +971,8 @@ const buttons = {
   'btn-clear': clearTown,
   'btn-share': share,
   'btn-sound': toggleMute,
+  'btn-brush': () => setTouchTool('brush'),
+  'btn-erase': () => setTouchTool('erase'),
   'help-close': () => setHelp(false),
   'help-open': () => setHelp(true),
 };
