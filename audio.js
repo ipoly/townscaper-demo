@@ -8,23 +8,16 @@ export class Sfx {
     this.ctx = null;
     this.muted = false;
     this.lastPop = 0;
-    this.unlocked = false;
     // Go fully silent while the page is hidden (other app, locked screen, background tab).
-    // The context is closed rather than suspended: iOS refuses to resume one outside a gesture
-    // after backgrounding, and sometimes reports it running while it stays silent.
-    const sync = () => {
-      if (document.hidden) this.close();
-      else if (this.unlocked && !this.ctx) this.open();
-    };
-    document.addEventListener('visibilitychange', sync);
+    // The context is closed rather than suspended and only reopened by the next gesture: iOS
+    // leaves a context created or resumed outside a gesture silent after backgrounding.
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.close(); });
     addEventListener('pagehide', () => this.close());
-    addEventListener('pageshow', sync);
   }
 
   // Browsers only allow audio after a user gesture
   ensure() {
     if (document.hidden) return;
-    this.unlocked = true;
     if (!this.ctx) this.open();
     // iOS reports 'interrupted' after calls; a context opened outside a gesture starts suspended
     else if (this.ctx.state !== 'running') this.ctx.resume();
