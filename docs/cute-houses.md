@@ -217,5 +217,5 @@ the original Townscaper.
  - Dusk: a band of flickering glitter on the sea towards the low sun (seen when facing the sunset).
  - Lit floors switch on in their own random order as night falls, street lamps first: at dusk about
    four in five are on, at dawn only the early risers.
- - Chimneys only smoke at dusk.
+ - Chimneys smoke at dusk, and at dawn in half of the early-riser houses (breakfast).
  - All of it lives in the existing town and water shaders, no extra draw calls.

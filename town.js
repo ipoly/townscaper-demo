@@ -2071,7 +2071,13 @@ export class Town {
               noOutline = true;
               box(pos, yc + 0.05, yc + 0.052, 0.065, d, SHADOW, topMeta);
               noOutline = false;
-              R.fx.smoke.push({ x: pos[0], y: yc + 0.05, z: pos[1], born: I.b, seed: hash(v, L, 4) });
+              // wake: the earliest switch-on order among the house's floors; half the early risers cook breakfast
+              let wake = 0;
+              for (let l = 0; l <= L; l++) {
+                const o = this.has(v, l) ? infoOf(v, l).info.lit : 0;
+                if (o > 0 && (!wake || o < wake)) wake = o;
+              }
+              R.fx.smoke.push({ x: pos[0], y: yc + 0.05, z: pos[1], born: I.b, seed: hash(v, L, 4), wake, breakfast: hash(v, L, 5) < 0.5 });
             }
           }
 

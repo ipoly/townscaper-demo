@@ -558,11 +558,14 @@ const puffs = [];
 const tmpMat = new THREE.Matrix4(), tmpQuat = new THREE.Quaternion(), tmpPos = new THREE.Vector3(), tmpScale = new THREE.Vector3();
 
 function updateSmoke(t) {
-  // Chimneys only smoke at dusk, when supper is on; puffs already out drift away
-  if (uDusk.value < 0.5) chimneyNext.clear();
-  else for (const c of chimneys) {
-    if (t < c.born + 0.8) continue;
+  // Chimneys smoke at dusk when supper is on, and at dawn in half the houses already lit (breakfast).
+  // Puffs already out drift away
+  const dusk = uDusk.value > 0.5, dawn = uRays.value > 0.5;
+  for (const c of chimneys) {
     const key = `${c.x.toFixed(2)},${c.z.toFixed(2)}`;
+    const cooking = dusk || (dawn && c.breakfast && c.wake > 0 && uNight.value > c.wake * 0.5 + 0.02);
+    if (!cooking) { chimneyNext.delete(key); continue; }
+    if (t < c.born + 0.8) continue;
     const next = chimneyNext.get(key) ?? t + c.seed * 1.5;
     if (t >= next) {
       if (puffs.length < SMOKE_MAX) puffs.push({ x: c.x, y: c.y, z: c.z, t0: t, spin: Math.random() * 6 });
