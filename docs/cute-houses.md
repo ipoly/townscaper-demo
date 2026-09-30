@@ -28,7 +28,7 @@ the original Townscaper.
 ### Phase 2: rounded volumes
 
 - [x] Bevelled / rounded wall corners (transition faces at corners, keep outline pairing intact)
-- [~] Rounded ridges and eaves (eaves follow rounded corners; hip ridges deferred)
+- [x] Rounded ridges and eaves (eaves follow rounded corners; ridge caps in phase 4)
 - [x] Simple vertex AO (wall feet, under eaves) to replace outlines
 
 ### Phase 3: rounded base and small props
@@ -36,7 +36,13 @@ the original Townscaper.
 - [x] Rounded foundation corners (quay stones and foam follow the arc)
 - [x] Flower boxes under some windows
 - [x] Striped awnings over some doors
-- [ ] Rounded ridge caps on hip roofs (deferred)
+- [x] Rounded ridge caps on hip roofs (moved to phase 4)
+
+### Phase 4: roof and door details
+
+- [x] Rounded ridge caps on ridges and hips
+- [x] Chunky chimneys with a cap
+- [x] Arched double doors
 
 ## Progress log
 
@@ -73,3 +79,11 @@ the original Townscaper.
    the plaza doors.
  - Known leftovers: a house on a square foundation can still round its own corner (a ledge fills the
    step); hip ridge caps stay sharp.
+- 2026-09-30: phase 4 done.
+ - Ridge caps: `ridgeCap()` lays a half-round tube (`RIDGE_R`) along each ridge half edge C -> M
+   (drawn once, by the quadrant it starts in) and along each convex hip from the apex to the corner
+   and on to the eave tip. Valleys (L-shaped inner corners) and flat roofs get none.
+ - Chimneys: thicker stack in the wall color (brick on pale walls) with a white cap and a dark flue;
+   smoke starts at the cap.
+ - Doors: about 60% of the double doors without an awning get a half-round fanlight over both wings.
+ - Known leftovers: hip caps kink slightly where they cross from the roof onto the eave.

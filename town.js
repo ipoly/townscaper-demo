@@ -17,6 +17,7 @@ const ROOF_RISE = 0.6;
 const EAVE = 0.09; // how far roofs overhang the walls
 const EAVE_DROP = 0.07;
 const EAVE_RIM = 0.04;
+const RIDGE_R = 0.03; // radius of the rounded caps along roof ridges and hips
 const CORNER = 0.12; // how far a rounded outer corner reaches along each wall
 const AO_BAND = 0.2; // height of the darker band at a wall's foot or under its eaves
 const AO_FOOT = 0.8;
@@ -940,6 +941,32 @@ export class Town {
         quad(add(a, o0), add(b, o0), add(b, o1), add(a, o1), [o0[0] + o1[0], o0[1] + o1[1], o0[2] + o1[2]], color, m);
       }
     };
+    // Half-round cap along a roof crease through the 3D points pts, half sunk into the roof;
+    // the last end is closed when capEnd is set
+    const ridgeCap = (pts, r, color, m, capEnd) => {
+      noOutline = true;
+      let prof = null, dn = null;
+      for (let s = 0; s + 1 < pts.length; s++) {
+        const a = pts[s], b = pts[s + 1];
+        const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], dl = Math.hypot(...d) || 1;
+        dn = [d[0] / dl, d[1] / dl, d[2] / dl];
+        const hl = Math.hypot(dn[0], dn[2]) || 1, u = [-dn[2] / hl, 0, dn[0] / hl];
+        let w = [u[1] * dn[2] - u[2] * dn[1], u[2] * dn[0] - u[0] * dn[2], u[0] * dn[1] - u[1] * dn[0]];
+        if (w[1] < 0) w = w.map((x) => -x);
+        const offs = [0, 1, 2, 3, 4].map((k) => {
+          const c = Math.cos((k / 4) * Math.PI) * r, sn = (Math.sin((k / 4) * Math.PI) - 0.3) * r;
+          return [0, 1, 2].map((j) => u[j] * c + w[j] * sn);
+        });
+        const add = (pt, o) => [pt[0] + o[0], pt[1] + o[1], pt[2] + o[2]];
+        prof = offs.map((o) => add(b, o));
+        for (let k = 0; k < 4; k++) {
+          const o0 = offs[k], o1 = offs[k + 1];
+          quad(add(a, o0), add(b, o0), add(b, o1), add(a, o1), [o0[0] + o1[0], o0[1] + o1[1], o0[2] + o1[2]], color, m);
+        }
+      }
+      if (capEnd) for (let k = 1; k < 4; k++) tri(prof[0], prof[k], prof[k + 1], dn, color, m);
+      noOutline = false;
+    };
     // Sagging string from a to b (3D); returns the point at t along it
     const sagString = (a, b, sag, color, m) => {
       const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - sag * 4 * t * (1 - t), a[2] + (b[2] - a[2]) * t];
@@ -1494,8 +1521,20 @@ export class Town {
       };
       // Door leaf u0..u1 (u = 0 at the edge midpoint); starting at 0 it is one wing of a double
       // door centered on the face, whose other wing comes from the neighbouring half-wall
-      const door = (u0, u1, color) => {
+      // An arched double door gets a half-round fanlight spanning both wings instead.
+      const door = (u0, u1, color, arched = false) => {
         const hd = 0.42, f = 0.05;
+        if (arched && u0 === 0) {
+          const r = u1 * len, fw = f * len;
+          rect(tm(0), tm(u1), 0.03, hd, color, 0.006);
+          slab(u1, u1 + f, 0.03, y0, y0 + hd + 0.03, WHITE);
+          slab(0, u1, 0.03, y0 + hd, y0 + hd + 0.03, WHITE);
+          fan(y0 + hd + 0.03, r + fw, 0, Math.PI / 2, 0.008, WHITE);
+          fan(y0 + hd + 0.03, r, 0, Math.PI / 2, 0.012, WINDOW);
+          slab(0, u1 + f + 0.03, 0.08, y0, y0 + 0.03, STONE); // doorstep
+          rect(tm(u1 - 0.042), tm(u1 - 0.018), hd * 0.5, hd * 0.5 + 0.024, GOLD, 0.01);
+          return;
+        }
         rect(tm(u0), tm(u1), 0.03, hd, color, 0.006);
         rect(tm(u0), tm(u1), hd + 0.03, hd + 0.12, WINDOW, 0.006); // fanlight
         if (u0 > 0) slab(u0 - f, u0, 0.03, y0, y0 + hd + 0.12, WHITE);
@@ -1559,8 +1598,9 @@ export class Town {
       }
       // Ground floor facing a plaza, or any floor a walkway docks onto, gets a double door
       if ((facesPlaza && h < 0.6) || (units.bridge.has(this.key(target, L)) && h < 0.75)) {
-        door(0, 0.2, pickFrom(DOORS, hash(v, target, 3)));
-        if (facesPlaza && hash(v, target, 8) < 0.55) awning(0.29, y0 + 0.66, y0 + 0.54, 0.2, pickFrom(UMBRELLAS.slice(0, 3), hash(v, target, 9)));
+        const shaded = facesPlaza && hash(v, target, 8) < 0.55;
+        door(0, 0.2, pickFrom(DOORS, hash(v, target, 3)), !shaded && hash(v, target, 10) < 0.6);
+        if (shaded) awning(0.29, y0 + 0.66, y0 + 0.54, 0.2, pickFrom(UMBRELLAS.slice(0, 3), hash(v, target, 9)));
         return;
       }
       if (h < 0.1) return; // blank wall
@@ -1769,6 +1809,30 @@ export class Town {
             }
             fanOver(C[i], hC, rim(hN, hQ, hP), [0, 1, 0], color, topMeta);
             if (eaved[i]) eaves(i, C, M, Q, occ, eaved, arc, yt, color, topMeta);
+            // Rounded caps on the ridge (each half edge C -> M once, from the quadrant it starts
+            // in) and on the hip from the apex down to the corner and out to the eave tip
+            if (eaved[i] && !allHigh) {
+              const cap = color.clone().multiplyScalar(1.06);
+              if (ridge[n] && eaved[n] && inf[n].r === rise) ridgeCap([p3(C[i], hC), p3(M[i], hC)], RIDGE_R, cap, topMeta, false);
+              if (!(high[n] && high[p])) {
+                const pts = [p3(C[i], hC)];
+                if (arc) {
+                  const k = arc.pts.length >> 1, e = arc.pts[k], en = arc.nrm[k];
+                  pts.push(p3(e, yt), p3([e[0] + en[0] * EAVE, e[1] + en[1] * EAVE], yt - EAVE_DROP));
+                } else {
+                  pts.push(p3(Q, yt));
+                  const wm = !occ[p] ? M[p] : !occ[n] ? M[i] : null;
+                  if (wm) {
+                    const dl = Math.hypot(Q[0] - C[i][0], Q[1] - C[i][1]) || 1, d = [(Q[0] - C[i][0]) / dl, (Q[1] - C[i][1]) / dl];
+                    const wl = Math.hypot(wm[0] - Q[0], wm[1] - Q[1]) || 1, wn = [(wm[1] - Q[1]) / wl, -(wm[0] - Q[0]) / wl];
+                    const cos = Math.abs(d[0] * wn[0] + d[1] * wn[1]);
+                    const t = Math.min(EAVE * 1.6, EAVE / Math.max(cos, 0.3));
+                    pts.push(p3([Q[0] + d[0] * t, Q[1] + d[1] * t], yt - EAVE_DROP));
+                  }
+                }
+                ridgeCap(pts, RIDGE_R, cap, topMeta, true);
+              }
+            }
 
             if (firstQuad && I.lt) lighthouseTop(C[i], hC, topMeta);
             const isRow = I.ut === 'row';
@@ -1794,8 +1858,14 @@ export class Town {
               const pos = lerp2(C[i], Q, 0.5);
               const dir = [M[i][0] - C[i][0], M[i][1] - C[i][1]];
               const dl = Math.hypot(dir[0], dir[1]) || 1;
-              box(pos, (hC + hQ) / 2 - 0.1, hC + 0.15, 0.07, [dir[0] / dl, dir[1] / dl], BRICK, topMeta);
-              R.fx.smoke.push({ x: pos[0], y: hC + 0.15, z: pos[1], born: I.b, seed: hash(v, L, 4) });
+              // Chunky stack in the wall color (brick on pale houses) with a white cap and dark flue
+              const d = [dir[0] / dl, dir[1] / dl], yc = hC + 0.06;
+              box(pos, (hC + hQ) / 2 - 0.1, yc, 0.095, d, wallColor.r + wallColor.g + wallColor.b > 2.6 ? BRICK : wallColor, topMeta);
+              box(pos, yc, yc + 0.05, 0.12, d, WHITE, topMeta);
+              noOutline = true;
+              box(pos, yc + 0.05, yc + 0.052, 0.065, d, SHADOW, topMeta);
+              noOutline = false;
+              R.fx.smoke.push({ x: pos[0], y: yc + 0.05, z: pos[1], born: I.b, seed: hash(v, L, 4) });
             }
           }
 
