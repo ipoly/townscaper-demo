@@ -158,3 +158,14 @@ the original Townscaper.
    window is half buried under the roof.
  - Walkway and dock corners stay square on purpose: plank piers and railed walkways read as built
    timber. (Ground-floor corners already round off since phase 2.)
+- 2026-09-30: new wall + roof palette, generated offline as pairs with `tools/palette.mjs` (Color.js,
+  nothing is loaded at runtime).
+ - A color choice is a wall + roof pair, so all nine pairs are searched together (seeded simulated
+   annealing) and the score is the distance between the two most alike pairs. Picking each color on
+   its own left some pairs almost identical.
+ - Each wall slot has a hue family and a lightness tier (white, butter, marigold, apricot, coral,
+   rose, sage, mint, sky; four pale, three mid, two bold) and a short list of roofs that suit it.
+   Roofs are not reused, at least four are warm, and every roof is at least 0.25 darker than its wall.
+ - Colors that do not fit sRGB lose chroma only; lightness and hue are kept exactly.
+ - Closest pair: deltaE 11.2 (walls) / 10.0 (roofs), OKLab x100. Old share links open with different
+   colors.
