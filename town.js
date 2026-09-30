@@ -1064,8 +1064,8 @@ export class Town {
         // Central stem that flares out with struts, like a dovecote
         const y0 = I.pb;
         if (firstQuad) {
-          prism(c, 0.24, y0, yb, 8, wallColor.clone().multiplyScalar(0.85), m);
-          box(offset(c, Math.atan2(toC[1], toC[0]) + Math.PI, 0.235), y0 + 0.5, y0 + 0.78, 0.035, toC, WINDOW, m);
+          prism(c, 0.28, y0, yb, 8, wallColor.clone().multiplyScalar(0.85), m);
+          box(offset(c, Math.atan2(toC[1], toC[0]) + Math.PI, 0.275), y0 + 0.5, y0 + 0.78, 0.035, toC, WINDOW, m);
         }
         const a = lerp2(c, Q, 0.3), b = lerp2(c, Q, 0.82);
         bar([a[0], y0 + (yb - y0) * 0.55, a[1]], [b[0], yb - 0.02, b[1]], 0.025, WOOD, m);
@@ -1076,9 +1076,9 @@ export class Town {
       let e = -1;
       for (let j = 0; j < 4; j++) if (mine(j) && (e < 0 || inf[j].pb > inf[e].pb)) e = j;
       if (e !== i) return;
-      const post = lerp2(Q, c, 0.16);
+      const post = lerp2(Q, c, 0.2);
       const y0 = I.pb, y1 = yb;
-      // Knee braces reach out along the unit's outer edges, or both ways at an outer corner
+      // Knee braces on timber posts reach out along the unit's outer edges, or both ways at an outer corner
       let edges = [[n, M[i]], [p, M[p]]].filter(([j]) => !mine(j)).map(([, mid]) => mid);
       if (!edges.length) edges = [M[i], M[p]];
       const knees = (drop, r) => {
@@ -1088,23 +1088,21 @@ export class Town {
         }
       };
       if (kind === 'colonnade') {
-        prism(post, 0.055, y0, y1 - 0.07, 8, WHITE, m);
-        box(post, y0, y0 + 0.05, 0.075, toC, WHITE, m);
-        box(post, y1 - 0.08, y1, 0.08, toC, WHITE, m);
+        prism(post, 0.08, y0, y1 - 0.08, 8, WHITE, m);
+        box(post, y0, y0 + 0.06, 0.1, toC, WHITE, m);
+        box(post, y1 - 0.09, y1, 0.105, toC, WHITE, m);
       } else if (kind === 'timber') {
-        box(post, y0, y1, 0.04, toC, WOOD, m);
-        knees(0.3, 0.018);
+        box(post, y0, y1, 0.055, toC, WOOD, m);
+        knees(0.3, 0.026);
       } else if (kind === 'stilts') {
-        box(post, y0, y1, 0.06, toC, STONE, m);
-        box(post, y1 - 0.07, y1, 0.08, toC, STONE.clone().multiplyScalar(0.9), m);
-        knees(0.3, 0.022);
+        box(post, y0, y1, 0.085, toC, STONE, m);
+        box(post, y1 - 0.08, y1, 0.105, toC, STONE.clone().multiplyScalar(0.9), m);
       } else {
         // Tall pillar down to a far roof or the sea bed, thicker the longer it runs
-        const r = Math.min(0.1, 0.06 + (y1 - y0) * 0.008);
-        box(post, y0, y0 + 0.1, r + 0.03, toC, STONE.clone().multiplyScalar(0.85), m);
-        prism(post, r, y0, y1 - 0.08, 8, STONE, m);
-        box(post, y1 - 0.09, y1, r + 0.025, toC, STONE.clone().multiplyScalar(0.9), m);
-        knees(0.4, 0.024);
+        const r = Math.min(0.13, 0.085 + (y1 - y0) * 0.008);
+        box(post, y0, y0 + 0.12, r + 0.035, toC, STONE.clone().multiplyScalar(0.85), m);
+        prism(post, r, y0, y1 - 0.09, 8, STONE, m);
+        box(post, y1 - 0.1, y1, r + 0.03, toC, STONE.clone().multiplyScalar(0.9), m);
       }
     };
 
