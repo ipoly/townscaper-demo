@@ -92,7 +92,8 @@ the original Townscaper.
  - Chimneys: thicker stack in the wall color (brick on pale walls) with a white cap and a dark flue;
    smoke starts at the cap.
  - Doors: about 60% of the double doors without an awning get a half-round fanlight over both wings.
- - Known leftovers: hip caps kink slightly where they cross from the roof onto the eave.
+ - Known leftovers: hip caps kink slightly where they cross from the roof onto the eave (fixed
+   after phase 5).
 - 2026-09-30: phase 5 done.
  - Lanterns: `lantern()` hangs a slate-framed `LAMP` box on a bracket beside ~50% of the double doors,
    clear of the awning; it glows with the other lamps at night.
@@ -100,3 +101,7 @@ the original Townscaper.
    (not on docks).
  - Finials: a pointed roof whose column has no neighbours at that level gets a slate stem and a gold
    knob at the apex.
+- 2026-09-30: hip cap kink fixed.
+ - `ridgeCap()` now builds one profile per point instead of one frame per segment. Interior points
+   use the averaged direction and are stretched along the bend onto the mitre plane, so the roof and
+   eave segments of a hip share their joint ring and the cap no longer narrows or steps there.

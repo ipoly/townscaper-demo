@@ -945,26 +945,42 @@ export class Town {
     // the last end is closed when capEnd is set
     const ridgeCap = (pts, r, color, m, capEnd) => {
       noOutline = true;
-      let prof = null, dn = null;
-      for (let s = 0; s + 1 < pts.length; s++) {
-        const a = pts[s], b = pts[s + 1];
-        const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], dl = Math.hypot(...d) || 1;
-        dn = [d[0] / dl, d[1] / dl, d[2] / dl];
+      const norm = (d) => {
+        const l = Math.hypot(...d) || 1;
+        return [d[0] / l, d[1] / l, d[2] / l];
+      };
+      const dirs = [];
+      for (let s = 0; s + 1 < pts.length; s++) dirs.push(norm([0, 1, 2].map((j) => pts[s + 1][j] - pts[s][j])));
+      // One profile per point; interior points use the averaged direction and are stretched
+      // along the bend so both segments meet on the mitre plane without a kink.
+      const profs = pts.map((pt, s) => {
+        const din = dirs[Math.max(0, s - 1)], dout = dirs[Math.min(dirs.length - 1, s)];
+        const dn = norm([0, 1, 2].map((j) => din[j] + dout[j]));
         const hl = Math.hypot(dn[0], dn[2]) || 1, u = [-dn[2] / hl, 0, dn[0] / hl];
         let w = [u[1] * dn[2] - u[2] * dn[1], u[2] * dn[0] - u[0] * dn[2], u[0] * dn[1] - u[1] * dn[0]];
         if (w[1] < 0) w = w.map((x) => -x);
-        const offs = [0, 1, 2, 3, 4].map((k) => {
-          const c = Math.cos((k / 4) * Math.PI) * r, sn = (Math.sin((k / 4) * Math.PI) - 0.3) * r;
-          return [0, 1, 2].map((j) => u[j] * c + w[j] * sn);
+        const bd = [0, 1, 2].map((j) => dout[j] - din[j]), bl = Math.hypot(...bd);
+        const b = bl > 1e-6 ? bd.map((x) => x / bl) : null;
+        const c = Math.max(0.5, din[0] * dn[0] + din[1] * dn[1] + din[2] * dn[2]);
+        return [0, 1, 2, 3, 4].map((k) => {
+          const cs = Math.cos((k / 4) * Math.PI) * r, sn = (Math.sin((k / 4) * Math.PI) - 0.3) * r;
+          let o = [0, 1, 2].map((j) => u[j] * cs + w[j] * sn);
+          if (b) {
+            const ob = (o[0] * b[0] + o[1] * b[1] + o[2] * b[2]) * (1 / c - 1);
+            o = o.map((x, j) => x + b[j] * ob);
+          }
+          return { p: [pt[0] + o[0], pt[1] + o[1], pt[2] + o[2]], o };
         });
-        const add = (pt, o) => [pt[0] + o[0], pt[1] + o[1], pt[2] + o[2]];
-        prof = offs.map((o) => add(b, o));
+      });
+      for (let s = 0; s + 1 < pts.length; s++) {
+        const A = profs[s], B = profs[s + 1];
         for (let k = 0; k < 4; k++) {
-          const o0 = offs[k], o1 = offs[k + 1];
-          quad(add(a, o0), add(b, o0), add(b, o1), add(a, o1), [o0[0] + o1[0], o0[1] + o1[1], o0[2] + o1[2]], color, m);
+          const hint = [0, 1, 2].map((j) => A[k].o[j] + A[k + 1].o[j]);
+          quad(A[k].p, B[k].p, B[k + 1].p, A[k + 1].p, hint, color, m);
         }
       }
-      if (capEnd) for (let k = 1; k < 4; k++) tri(prof[0], prof[k], prof[k + 1], dn, color, m);
+      const last = profs[profs.length - 1];
+      if (capEnd) for (let k = 1; k < 4; k++) tri(last[0].p, last[k].p, last[k + 1].p, dirs[dirs.length - 1], color, m);
       noOutline = false;
     };
     // Sagging string from a to b (3D); returns the point at t along it
