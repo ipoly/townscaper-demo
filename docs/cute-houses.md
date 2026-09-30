@@ -61,6 +61,11 @@ the original Townscaper.
 - [x] Round, smooth white smoke puffs instead of grey faceted balls
 - [x] Potted shrubs beside some plaza doors
 
+### Phase 8: street strings and plaza props
+
+- [x] Bunting or a washing line strung across the street between two facing houses
+- [x] Lamp posts and benches on squares, courtyards and small plazas
+
 ## Progress log
 
 - 2026-09-30: diagnosis done; starting phase 1 items 1-3.
@@ -135,3 +140,12 @@ the original Townscaper.
    swell and shrink away as they drift off, so they no longer read as floating rocks.
  - Door pots: ~45% of the ground-floor plaza door halves get a terracotta pot with a round shrub past
    the doorstep, half of them with a few blooms.
+- 2026-09-30: phase 8 done.
+ - Street strings: an empty ground cell (no dock, no pond, nothing built above) whose two most
+   opposite neighbours both have at least two solid floors stores the pair in `info.ss` (~60%).
+   `streetString()` hangs a sagging line between the two wall midpoints just under the second-floor
+   roofline, with triangle flags (~55%) or three hanging cloths.
+ - Plaza props: `plazaProp()` puts a short slate lamp post with a glowing head or a wooden bench with
+   a backrest on square and courtyard cells, and less often on small plaza cells.
+ - The nook bunting and laundry and the landing lamps already existed; these add the street and
+   plaza versions.

@@ -682,6 +682,27 @@ export class Town {
         const spot = this.boatSpot(v, units);
         if (spot) info.boat = spot;
       }
+      // String across the street between two facing houses: the two most opposite neighbours
+      // with at least two solid floors, over a cell with nothing built above it
+      if (info.gt !== 'dock' && !units.ponds.has(v) && hash(v, 130) < 0.6) {
+        const { neighbors, verts } = this.grid;
+        const solid = (u, l) => this.has(u, l) && !units.bridge.has(this.key(u, l));
+        const tall = neighbors[v].filter((u) => solid(u, 1) && solid(u, 2));
+        const dir = (u) => {
+          const d = [verts[u][0] - verts[v][0], verts[u][1] - verts[v][1]], l = Math.hypot(d[0], d[1]);
+          return [d[0] / l, d[1] / l];
+        };
+        let best = null, bd = -0.8;
+        for (let a = 0; a < tall.length; a++) {
+          for (let b = a + 1; b < tall.length; b++) {
+            const da = dir(tall[a]), db = dir(tall[b]), d = da[0] * db[0] + da[1] * db[1];
+            if (d < bd) [bd, best] = [d, [tall[a], tall[b]]];
+          }
+        }
+        let clear = true;
+        for (let l = 1; l < MAX_LEVEL; l++) if (this.has(v, l)) clear = false;
+        if (best && clear) info.ss = best;
+      }
       return info;
     }
     const ru = units.roof.get(k);
@@ -1013,6 +1034,51 @@ export class Town {
       }
     };
     const offset = (c2, ang, r) => [c2[0] + Math.cos(ang) * r, c2[1] + Math.sin(ang) * r];
+    // Bunting or a washing line across the street over ground cell v, between the second-floor
+    // walls of the two facing houses (walls pass through the edge midpoints)
+    const streetString = (v, [a, b], m) => {
+      const y = yBottom(2) + 0.67;
+      const pa = p3(lerp2(verts[v], verts[a], 0.5), y), pb = p3(lerp2(verts[v], verts[b], 0.5), y);
+      const len = Math.hypot(pb[0] - pa[0], pb[2] - pa[2]);
+      if (hash(v, 131) < 0.55) {
+        const at = sagString(pa, pb, 0.09, WHITE, m);
+        const n = Math.max(3, Math.round(len / 0.17)), step = 0.84 / n;
+        for (let f = 0; f < n; f++) {
+          const t0 = 0.08 + f * step, a0 = at(t0), a1 = at(t0 + step * 0.7), c = at(t0 + step * 0.35);
+          hanging([a0, a1, [c[0], c[1] - 0.1, c[2]]], pickFrom(UMBRELLAS, hash(v, 132 + f)), m);
+        }
+      } else {
+        const at = sagString(pa, pb, 0.07, WHITE, m);
+        for (let f = 0; f < 3; f++) {
+          const t0 = 0.2 + f * 0.22, a0 = at(t0), a1 = at(t0 + 0.12);
+          const hgt = 0.1 + hash(v, 150 + f) * 0.07;
+          const col = pickFrom([WHITE, ...WALLS, ...SHUTTERS], hash(v, 160 + f));
+          hanging([a0, a1, [a1[0], a1[1] - hgt, a1[2]], [a0[0], a0[1] - hgt, a0[2]]], col, m);
+        }
+      }
+    };
+    // Street lamp or a bench standing on a square; chance scales how often
+    const plazaProp = (c2, y, v, m, chance = 1) => {
+      const s = hash(v, 140) / chance;
+      if (s < 0.16) {
+        prism(c2, 0.035, y, y + 0.04, 6, SLATE, m);
+        box(c2, y + 0.04, y + 0.5, 0.013, [1, 0], SLATE, m);
+        box(c2, y + 0.5, y + 0.59, 0.035, [1, 0], LAMP, m);
+        cone(c2, 0.06, y + 0.59, y + 0.65, 4, SLATE, m, Math.PI / 4);
+      } else if (s < 0.34) {
+        // Slatted wooden bench on slate legs, along a grid edge
+        const u = verts[this.grid.neighbors[v][0]];
+        const dl = Math.hypot(u[0] - c2[0], u[1] - c2[1]) || 1, d = [(u[0] - c2[0]) / dl, (u[1] - c2[1]) / dl];
+        const nr = [-d[1], d[0]];
+        const pt = (t, o) => [c2[0] + d[0] * t + nr[0] * o, c2[1] + d[1] * t + nr[1] * o];
+        for (const t of [-0.12, 0.12]) {
+          box(pt(t, 0.01), y, y + 0.1, 0.014, d, SLATE, m);
+          box(pt(t, -0.045), y, y + 0.22, 0.012, d, SLATE, m);
+        }
+        for (const o of [-0.02, 0.025]) bar(p3(pt(-0.16, o), y + 0.1), p3(pt(0.16, o), y + 0.1), 0.02, WOOD, m);
+        for (const yy of [0.16, 0.21]) bar(p3(pt(-0.16, -0.05), y + yy), p3(pt(0.16, -0.05), y + yy), 0.017, WOOD, m);
+      }
+    };
     const terraceProps = (c2, y, v, L, m) => {
       const s = hash(v, L, 61);
       if (s < 0.45) {
@@ -1856,10 +1922,12 @@ export class Town {
             let color;
             if (L === 0) {
               const type = I.gt;
+              if (firstQuad && I.ss) streetString(v, I.ss, topMeta);
               if (type === 'small') {
                 const g = hash(v, 11);
                 color = g < 0.45 ? PLAZA : GRASS;
                 if (g > 0.75 && firstQuad && !I.cv) tree(C[i], yt, 0.26, topMeta, hash(v, 12));
+                else if (g < 0.45 && firstQuad && !I.cv) plazaProp(C[i], yt, v, topMeta, 0.5);
               } else if (type === 'dock') {
                 color = pickFrom(PLANKS, hash(v, 53));
                 if (firstQuad && I.boat) {
@@ -1872,6 +1940,7 @@ export class Town {
                   const treeChance = { park: 0.55, courtyard: 0.4, square: 0.15 }[type];
                   if (I.gc && type !== 'park') fountain(C[i], yt, type === 'square' ? 1 : 0.7, topMeta);
                   else if (I.gc || hash(v, 12) < treeChance) tree(C[i], yt, 0.22 + hash(v, 13) * 0.1, topMeta, hash(v, 14));
+                  else if (type !== 'park') plazaProp(C[i], yt, v, topMeta);
                 }
               }
             } else if (I.lt) {
