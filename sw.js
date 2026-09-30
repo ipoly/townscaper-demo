@@ -7,6 +7,8 @@ const CORE = [
   './',
   './main.js',
   './town.js',
+  './town/constants.js',
+  './town/emitter.js',
   './grid.js',
   './audio.js',
   './manifest.webmanifest',

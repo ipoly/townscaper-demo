@@ -287,3 +287,9 @@ step keeps the geometry byte for byte the same.
   with edits rebuilt incrementally, and compares a fingerprint of every vertex attribute, outline
   and effect list with tests/snapshot.json (`--update` records a new baseline). It runs in about a
   second and a 0.0001 change to the eave overhang fails every town.
+- 2026-09-30: step 2, the emitter. Measurements, colors and hash helpers moved to
+  town/constants.js; the low-level drawing (triangles, boxes, prisms, cones, bars, ridge caps,
+  strings, cloth) moved to an Emitter class in town/emitter.js that owns the current record and the
+  outline / sway / shading flags, which used to be variables shared across the whole build closure.
+  buildRecords destructures the tools, so call sites are unchanged. Snapshot identical; a full
+  build takes the same time (about 185 ms for a 90-column town in Node).

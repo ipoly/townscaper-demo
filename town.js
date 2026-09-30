@@ -8,84 +8,10 @@
 // an edit only re-emits the quads whose inputs actually changed.
 
 import * as THREE from 'three';
+import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, EAVE_RIM, RIDGE_R, CORNER, AO_BAND, AO_FOOT, AO_EAVES, SPIRE_RISE, ARCH_RISE, DECK, POND_Y, PALETTE, WALLS, ROOFS, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WINDOW, CURTAINS, IVY, WHITE, BRICK, TRUNK, FOAM, WATER, COPPER, GOLD, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, LILY, BLOSSOM, TERRACE, TERRACOTTA, UMBRELLAS, BLOOMS, LEAVES, SHUTTERS, DOORS, yBottom, yTop, hash, pickFrom } from './town/constants.js';
+import { Emitter, p3, lerp2, ring } from './town/emitter.js';
 
-export const MAX_LEVEL = 10;
-const BASE_BOTTOM = -0.4;
-const BASE_TOP = 0.3;
-const LEVEL_H = 0.75;
-const ROOF_RISE = 0.6;
-const EAVE = 0.09; // how far roofs overhang the walls
-const EAVE_DROP = 0.07;
-const EAVE_RIM = 0.04;
-const RIDGE_R = 0.03; // radius of the rounded caps along roof ridges and hips
-const CORNER = 0.12; // how far a rounded outer corner reaches along each wall
-const AO_BAND = 0.2; // height of the darker band at a wall's foot or under its eaves
-const AO_FOOT = 0.8;
-const AO_EAVES = 0.84;
-const SPIRE_RISE = 1.3;
-const ARCH_RISE = 0.4;
-const DECK = 0.24;
-const POND_Y = 0.12;
-
-export const PALETTE = ['#f6f3ec', '#fbe6b3', '#f2c85b', '#fcc28d', '#ff9592', '#ffd9e2', '#b0dfa3', '#83e4d5', '#cce9ff'];
-export const ROOF_OF = ['#c95a37', '#158374', '#474e55', '#af3d36', '#874465', '#624377', '#b17300', '#335189', '#4978a7'];
-const WALLS = PALETTE.map((c) => new THREE.Color(c));
-const ROOFS = ROOF_OF.map((c) => new THREE.Color(c));
-const STONE = new THREE.Color('#b8a58a');
-const PLAZA = new THREE.Color('#dccfb4');
-const GRASS = new THREE.Color('#9cc27a');
-const ROOF_FLAT = new THREE.Color('#a39a92');
-const GARDEN = new THREE.Color('#86b36a');
-const WINDOW = new THREE.Color('#3b4a5a');
-const CURTAINS = ['#f4eee2', '#f6d9d2', '#e3eef0'].map((c) => new THREE.Color(c));
-const IVY = ['#4f8a45', '#5f9a4c', '#467d3e'].map((c) => new THREE.Color(c));
-const WHITE = new THREE.Color('#f7f4ee');
-const BRICK = new THREE.Color('#8a5a4a');
-const TRUNK = new THREE.Color('#7a5a40');
-const FOAM = new THREE.Color('#d9eff4');
-const WATER = new THREE.Color('#7cc4dc');
-const COPPER = new THREE.Color('#6fae9a');
-const GOLD = new THREE.Color('#e0b84a');
-const SLATE = new THREE.Color('#4e5f78');
-const LH_RED = new THREE.Color('#c9473a');
-const LAMP = new THREE.Color('#fff3b8');
-const LAMP_ORDER = 0.08; // street lamps come on before any window
-const WOOD = new THREE.Color('#7d5f43');
-const PLANKS = ['#b8925f', '#a98556'].map((c) => new THREE.Color(c));
-const DECK_TOP = new THREE.Color('#d8cbb0');
-const SHADOW = new THREE.Color('#4a423c');
-const POND = { lily: '#5c9f86', lagoon: '#62aecb', basin: '#74c0d6', well: '#2f4d5c' };
-const POND_COLORS = Object.fromEntries(Object.entries(POND).map(([k, c]) => [k, new THREE.Color(c)]));
-const BANK = new THREE.Color('#7f8f5a');
-const REED = new THREE.Color('#6b8f4a');
-const LILY = new THREE.Color('#5f9a48');
-const BLOSSOM = new THREE.Color('#f2a7c3');
-const TERRACE = new THREE.Color('#d8b48f');
-const TERRACOTTA = new THREE.Color('#b8643f');
-const UMBRELLAS = ['#e2574c', '#3f7fb5', '#f2c14e', '#f7f4ee'].map((c) => new THREE.Color(c));
-const BLOOMS = ['#e2574c', '#f2a7c3', '#f2c14e', '#7fb865'].map((c) => new THREE.Color(c));
-const LEAVES = ['#6fa35a', '#7fb865', '#5d9150', '#9bc46e'].map((c) => new THREE.Color(c));
-const SHUTTERS = ['#4f7f6a', '#4a6a8f', '#a8553f', '#e8e2d6'].map((c) => new THREE.Color(c));
-const DOORS = ['#6b4632', '#3f5e7a', '#7a3b3b', '#48664a'].map((c) => new THREE.Color(c));
-
-const ICO = new THREE.IcosahedronGeometry(1, 0).toNonIndexed().attributes.position.array;
-
-const yBottom = (L) => (L === 0 ? BASE_BOTTOM : BASE_TOP + (L - 1) * LEVEL_H);
-const yTop = (L) => BASE_TOP + L * LEVEL_H;
-// Height used for drag-building on a level: water surface for foundations, mid-floor otherwise
-export const levelPlaneY = (L) => (L === 0 ? 0 : (yBottom(L) + yTop(L)) / 2);
-
-function hash(...nums) {
-  let h = 2166136261;
-  for (const n of nums) {
-    h = Math.imul(h ^ (n | 0), 16777619);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0x5bd1e995);
-    h ^= h >>> 15;
-  }
-  return (h >>> 0) / 4294967296;
-}
-const pickFrom = (arr, r) => arr[Math.floor(r * arr.length) % arr.length];
+export { MAX_LEVEL, PALETTE, ROOF_OF, levelPlaneY } from './town/constants.js';
 
 // Outline pairing: an edge shared by two triangles is drawn only at a crease, and belongs
 // to the triangle that was born later so it pops in with that block
@@ -810,91 +736,9 @@ export class Town {
       return s;
     };
 
-    // --- Per-quad emission into the current record R ---
-    let R = null;
-    let noOutline = false;
-    let waveFn = null; // per-vertex sway weight for hanging cloth
-    let shadeFn = null; // per-vertex color multiplier, for baked occlusion
-
-    const tri = (a, b, c, hint, color, m) => {
-      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
-      const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
-      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      const flip = nx * hint[0] + ny * hint[1] + nz * hint[2] < 0;
-      if (flip) [b, c] = [c, b];
-      const len = (Math.hypot(nx, ny, nz) || 1) * (flip ? -1 : 1);
-      const n = [nx / len, ny / len, nz / len];
-      const pv = this.pivot(m.v, m.L);
-      const cell = m.pond ?? infoOf(m.v, m.L).info;
-      const glow = color === LAMP ? LAMP_ORDER : color === WINDOW || CURTAINS.includes(color) ? cell.lit : 0;
-      for (const p of [a, b, c]) {
-        R.position.push(p[0], p[1], p[2]);
-        R.normal.push(n[0], n[1], n[2]);
-        const k = shadeFn ? shadeFn(p) : 1;
-        R.color.push(color.r * k, color.g * k, color.b * k);
-        R.aPivot.push(pv[0], pv[1], pv[2]);
-        R.aBorn.push(cell.b);
-        R.aGlow.push(glow);
-        R.aWave.push(waveFn ? waveFn(p) : 0);
-      }
-      R.normals.push(n);
-      R.edgeless.push(noOutline);
-      R.meta.push(m);
-    };
-    const quad = (a, b, c, d, hint, color, m) => {
-      tri(a, b, c, hint, color, m);
-      tri(a, c, d, hint, color, m);
-    };
-    const p3 = (p, y) => [p[0], y, p[1]];
-    const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-
-    // Low-poly blob (tree canopy, bush)
-    const blob = (c, r, sy, color, m) => {
-      for (let i = 0; i < ICO.length; i += 9) {
-        const pt = (j) => [c[0] + ICO[i + j] * r, c[1] + ICO[i + j + 1] * r * sy, c[2] + ICO[i + j + 2] * r];
-        const a = pt(0), b = pt(3), d = pt(6);
-        const hint = [(a[0] + b[0] + d[0]) / 3 - c[0], (a[1] + b[1] + d[1]) / 3 - c[1], (a[2] + b[2] + d[2]) / 3 - c[2]];
-        tri(a, b, d, hint, color, m);
-      }
-    };
-
-    // Box aligned to a horizontal direction dir (unit, 2D)
-    const box = (c2, y0, y1, half, dir, color, m) => {
-      // Lamps get a round halo at night
-      if (color === LAMP) R.fx.glows.push({ x: c2[0], y: (y0 + y1) / 2, z: c2[1], born: (m.pond ?? infoOf(m.v, m.L).info).b });
-      const [dx, dz] = dir;
-      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => [
-        c2[0] + (dx * s - dz * t) * half,
-        c2[1] + (dz * s + dx * t) * half,
-      ]);
-      for (let i = 0; i < 4; i++) {
-        const a = corners[i], b = corners[(i + 1) % 4];
-        const out = [(a[0] + b[0]) / 2 - c2[0], 0, (a[1] + b[1]) / 2 - c2[1]];
-        quad(p3(a, y0), p3(b, y0), p3(b, y1), p3(a, y1), out, color, m);
-      }
-      quad(...corners.map((p) => p3(p, y1)), [0, 1, 0], color, m);
-    };
-
-    const ring = (c2, r, sides, yaw = 0) =>
-      Array.from({ length: sides }, (_, s) => {
-        const ang = yaw + (s / sides) * Math.PI * 2;
-        return [c2[0] + Math.cos(ang) * r, c2[1] + Math.sin(ang) * r];
-      });
-    const prism = (c2, r, y0, y1, sides, color, m, topColor = color) => {
-      const pts = ring(c2, r, sides);
-      for (let s = 0; s < sides; s++) {
-        const a = pts[s], b = pts[(s + 1) % sides];
-        quad(p3(a, y0), p3(b, y0), p3(b, y1), p3(a, y1), [(a[0] + b[0]) / 2 - c2[0], 0, (a[1] + b[1]) / 2 - c2[1]], color, m);
-        tri(p3(c2, y1), p3(a, y1), p3(b, y1), [0, 1, 0], topColor, m);
-      }
-    };
-    const cone = (c2, r, y0, apex, sides, color, m, yaw = 0) => {
-      const pts = ring(c2, r, sides, yaw);
-      for (let s = 0; s < sides; s++) {
-        const a = pts[s], b = pts[(s + 1) % sides];
-        tri(p3(a, y0), p3(b, y0), p3(c2, apex), [(a[0] + b[0]) / 2 - c2[0], r, (a[1] + b[1]) / 2 - c2[1]], color, m);
-      }
-    };
+    // --- Per-quad emission, drawn through the emitter into its current record ---
+    const E = new Emitter((m) => this.pivot(m.v, m.L), (m) => m.pond ?? infoOf(m.v, m.L).info);
+    const { tri, quad, blob, box, prism, cone, bar, ridgeCap, sagString, hanging } = E;
 
     const fountain = (c2, y, scale, m) => {
       prism(c2, 0.34 * scale, y, y + 0.12, 8, WHITE, m, WATER);
@@ -923,9 +767,9 @@ export class Town {
             const ang = (s / 10) * Math.PI * 2;
             return [cx - dz * Math.cos(ang) * 0.1, cy + Math.sin(ang) * 0.1, cz + dx * Math.cos(ang) * 0.1];
           });
-          noOutline = true;
+          E.noOutline = true;
           for (let s = 0; s < 10; s++) tri([cx, cy, cz], face[s], face[(s + 1) % 10], [dx, 0, dz], WHITE, m);
-          noOutline = false;
+          E.noOutline = false;
           tri([cx + dx * 0.005, cy, cz + dz * 0.005], [cx + dx * 0.005, cy + 0.08, cz + dz * 0.005], [cx + dx * 0.005 - dz * 0.015, cy, cz + dz * 0.005 + dx * 0.015], [dx, 0, dz], SLATE, m);
         }
         box(c2, y + 0.85, y + 0.9, 0.2, [1, 0], WHITE, m);
@@ -940,7 +784,7 @@ export class Town {
       prism(c2, 0.24, y + 0.46, y + 0.5, 8, SLATE, m);
       cone(c2, 0.26, y + 0.5, y + 0.82, 8, LH_RED, m);
       prism(c2, 0.02, y + 0.82, y + 0.95, 4, GOLD, m);
-      R.fx.lamps.push({ x: c2[0], y: y + 0.29, z: c2[1], born: infoOf(m.v, m.L).info.b });
+      E.R.fx.lamps.push({ x: c2[0], y: y + 0.29, z: c2[1], born: infoOf(m.v, m.L).info.b });
     };
     // Two posts and a rail from a to b
     const fence = (a, b, y, color, m, h = 0.2) => {
@@ -951,84 +795,6 @@ export class Town {
       for (const side of [1, -1]) {
         quad(p3(a, y + h - 0.05), p3(b, y + h - 0.05), p3(b, y + h), p3(a, y + h), [-dir[1] * side, 0, dir[0] * side], color, m);
       }
-    };
-    // Square bar between two 3D points (beams, braces, strings)
-    const bar = (a, b, h, color, m) => {
-      const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-      const dl = Math.hypot(d[0], d[1], d[2]) || 1;
-      const dn = [d[0] / dl, d[1] / dl, d[2] / dl];
-      let u = [-dn[2], 0, dn[0]];
-      const ul = Math.hypot(u[0], u[2]);
-      u = ul < 1e-4 ? [1, 0, 0] : [u[0] / ul, 0, u[2] / ul];
-      const w = [u[1] * dn[2] - u[2] * dn[1], u[2] * dn[0] - u[0] * dn[2], u[0] * dn[1] - u[1] * dn[0]];
-      const o = [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([s1, s2]) => [0, 1, 2].map((k) => (u[k] * s1 + w[k] * s2) * h));
-      for (let k = 0; k < 4; k++) {
-        const o0 = o[k], o1 = o[(k + 1) % 4];
-        const add = (pt, off) => [pt[0] + off[0], pt[1] + off[1], pt[2] + off[2]];
-        quad(add(a, o0), add(b, o0), add(b, o1), add(a, o1), [o0[0] + o1[0], o0[1] + o1[1], o0[2] + o1[2]], color, m);
-      }
-    };
-    // Half-round cap along a roof crease through the 3D points pts, half sunk into the roof;
-    // the last end is closed when capEnd is set
-    const ridgeCap = (pts, r, color, m, capEnd) => {
-      noOutline = true;
-      const norm = (d) => {
-        const l = Math.hypot(...d) || 1;
-        return [d[0] / l, d[1] / l, d[2] / l];
-      };
-      const dirs = [];
-      for (let s = 0; s + 1 < pts.length; s++) dirs.push(norm([0, 1, 2].map((j) => pts[s + 1][j] - pts[s][j])));
-      // One profile per point; interior points use the averaged direction and are stretched
-      // along the bend so both segments meet on the mitre plane without a kink.
-      const profs = pts.map((pt, s) => {
-        const din = dirs[Math.max(0, s - 1)], dout = dirs[Math.min(dirs.length - 1, s)];
-        const dn = norm([0, 1, 2].map((j) => din[j] + dout[j]));
-        const hl = Math.hypot(dn[0], dn[2]) || 1, u = [-dn[2] / hl, 0, dn[0] / hl];
-        let w = [u[1] * dn[2] - u[2] * dn[1], u[2] * dn[0] - u[0] * dn[2], u[0] * dn[1] - u[1] * dn[0]];
-        if (w[1] < 0) w = w.map((x) => -x);
-        const bd = [0, 1, 2].map((j) => dout[j] - din[j]), bl = Math.hypot(...bd);
-        const b = bl > 1e-6 ? bd.map((x) => x / bl) : null;
-        const c = Math.max(0.5, din[0] * dn[0] + din[1] * dn[1] + din[2] * dn[2]);
-        return [0, 1, 2, 3, 4].map((k) => {
-          const cs = Math.cos((k / 4) * Math.PI) * r, sn = (Math.sin((k / 4) * Math.PI) - 0.3) * r;
-          let o = [0, 1, 2].map((j) => u[j] * cs + w[j] * sn);
-          if (b) {
-            const ob = (o[0] * b[0] + o[1] * b[1] + o[2] * b[2]) * (1 / c - 1);
-            o = o.map((x, j) => x + b[j] * ob);
-          }
-          return { p: [pt[0] + o[0], pt[1] + o[1], pt[2] + o[2]], o };
-        });
-      });
-      for (let s = 0; s + 1 < pts.length; s++) {
-        const A = profs[s], B = profs[s + 1];
-        for (let k = 0; k < 4; k++) {
-          const hint = [0, 1, 2].map((j) => A[k].o[j] + A[k + 1].o[j]);
-          quad(A[k].p, B[k].p, B[k + 1].p, A[k + 1].p, hint, color, m);
-        }
-      }
-      const last = profs[profs.length - 1];
-      if (capEnd) for (let k = 1; k < 4; k++) tri(last[0].p, last[k].p, last[k + 1].p, dirs[dirs.length - 1], color, m);
-      noOutline = false;
-    };
-    // Sagging string from a to b (3D); returns the point at t along it
-    const sagString = (a, b, sag, color, m) => {
-      const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - sag * 4 * t * (1 - t), a[2] + (b[2] - a[2]) * t];
-      for (let k = 0; k < 4; k++) bar(at(k / 4), at((k + 1) / 4), 0.006, color, m);
-      return at;
-    };
-    // Flat piece of cloth hanging from a string, visible from both sides and swaying
-    const hanging = (pts, color, m) => {
-      const y = Math.max(...pts.map((pt) => pt[1]));
-      noOutline = true;
-      waveFn = (pt) => (y - pt[1]) * 3;
-      const d = [pts[1][0] - pts[0][0], pts[1][2] - pts[0][2]];
-      for (const sd of [1, -1]) {
-        const hint = [-d[1] * sd, 0, d[0] * sd];
-        if (pts.length === 4) quad(...pts, hint, color, m);
-        else tri(...pts, hint, color, m);
-      }
-      waveFn = null;
-      noOutline = false;
     };
     const plants = (c2, y, seed, m) => {
       for (let k = 0; k < 2; k++) {
@@ -1125,9 +891,9 @@ export class Town {
         const d = unit(A, B), mid = lerp2(Ao, Bo, 0.5), base = lerp2(A, B, 0.5);
         quad(p3(A, y), p3(B, y), p3(Bo, yo), p3(Ao, yo), [0, 1, 0], color, m);
         quad(p3(Ao, yo), p3(Bo, yo), p3(Bo, yb), p3(Ao, yb), [mid[0] - base[0], 0, mid[1] - base[1]], color, m);
-        noOutline = true;
+        E.noOutline = true;
         quad(p3(A, y), p3(B, y), p3(Bo, yb), p3(Ao, yb), [0, -1, 0], shade, m);
-        noOutline = false;
+        E.noOutline = false;
         return d;
       };
       // Wall segment k (between quadrants k and k+1) offset by EAVE towards its empty side
@@ -1173,11 +939,11 @@ export class Town {
     // ground (foot) or tucks under the eaves, in place of ambient occlusion
     const face = (a, b, y0, y1, towards, color, m, foot, under) => {
       const yA = foot ? y0 + AO_BAND : y0, yB = under ? y1 - AO_BAND : y1;
-      shadeFn = (pt) => (foot && pt[1] < y0 + 1e-4 ? AO_FOOT : under && pt[1] > y1 - 1e-4 ? AO_EAVES : 1);
+      E.shadeFn = (pt) => (foot && pt[1] < y0 + 1e-4 ? AO_FOOT : under && pt[1] > y1 - 1e-4 ? AO_EAVES : 1);
       if (foot) quad(p3(a, y0), p3(b, y0), p3(b, yA), p3(a, yA), towards, color, m);
       quad(p3(a, yA), p3(b, yA), p3(b, yB), p3(a, yB), towards, color, m);
       if (under) quad(p3(a, yB), p3(b, yB), p3(b, y1), p3(a, y1), towards, color, m);
-      shadeFn = null;
+      E.shadeFn = null;
     };
     // Which bands a house wall of cell (v, L) gets
     const aoBands = (v, L) => {
@@ -1534,12 +1300,12 @@ export class Town {
       if (L === 0) {
         // Foam ring where the foundation meets the water, posts under docks
         if (!units.ponds.has(target)) {
-          noOutline = true;
+          E.noOutline = true;
           // Stops where a rounded corner takes over (fa/fb lie on a-b)
           const tOf = (pt) => ((pt[0] - a[0]) * (b[0] - a[0]) + (pt[1] - a[1]) * (b[1] - a[1])) / (len * len);
           const t0 = tOf(fa), t1 = tOf(fb);
           quad(p3(at(t0, 0.005), 0.02), p3(at(t1, 0.005), 0.02), p3(at(t1, 0.14), 0.02), p3(at(t0, 0.14), 0.02), [0, 1, 0], FOAM, m);
-          noOutline = false;
+          E.noOutline = false;
         }
         if (style === 'dock') box(at(0.5, 0.06), -0.3, y1 + 0.12, 0.05, dirAlong(), WOOD, m);
         return;
@@ -1573,7 +1339,7 @@ export class Town {
         for (let k = 0; k < 6; k++) tri(c0, pt(a0 + ((a1 - a0) * k) / 6), pt(a0 + ((a1 - a0) * (k + 1)) / 6), towards, c, m);
       };
       // Glass reflects the sky: panes brighten towards the top
-      const skyGlass = (yA, yB) => { shadeFn = (pt) => 1 + 0.6 * Math.max(0, Math.min(1, (pt[1] - yA) / (yB - yA))); };
+      const skyGlass = (yA, yB) => { E.shadeFn = (pt) => 1 + 0.6 * Math.max(0, Math.min(1, (pt[1] - yA) / (yB - yA))); };
       // Curtain gathered at the outer edge of a pane, tied back halfway down
       const curtain = (hw, yA, yT, c) => {
         const w = U(hw), yM = yA + (yT - yA) * 0.45;
@@ -1588,7 +1354,7 @@ export class Town {
         const I = infoOf(v, L).info;
         if (!I.lit) return;
         const c = at(tm(0), 0);
-        R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, rb, rt, order: I.lit, born: I.b });
+        E.R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, rb, rt, order: I.lit, born: I.b });
       };
       // Big window with a chunky frame, optionally round-arched; hw is its half width
       const window1 = (hw, h0, h1, round = false, drape = null) => {
@@ -1598,7 +1364,7 @@ export class Town {
         skyGlass(yA, yB);
         rect(tm(0), tm(w), h0, ys - y0, WINDOW, 0.004);
         if (round) fan(ys, hw, 0, Math.PI / 2, 0.012, WINDOW);
-        shadeFn = null;
+        E.shadeFn = null;
         if (drape) curtain(hw, yA, ys, drape);
         slab(w, w + f, 0.035, yA, ys, WHITE);
         slab(0, w + f + U(0.02), 0.06, yA - FRAME, yA, WHITE); // sill
@@ -1614,7 +1380,7 @@ export class Town {
         fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, WHITE);
         skyGlass(y0 + hc - r, y0 + hc + r);
         fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, WINDOW);
-        shadeFn = null;
+        E.shadeFn = null;
       };
       // Flower box hanging under a window's sill: this half fills u = 0..uw
       const flowerBox = (uw, yS, seed) => {
@@ -1638,9 +1404,9 @@ export class Town {
           const w0 = at(tm(u0), 0), w1 = at(tm(u1), 0), o0 = at(tm(u0), d), o1 = at(tm(u1), d);
           quad(p3(w0, yW), p3(w1, yW), p3(o1, yO), p3(o0, yO), [towards[0], 1, towards[2]], c, m);
           quad(p3(o0, yO), p3(o1, yO), p3(o1, yV), p3(o0, yV), towards, c, m);
-          noOutline = true;
+          E.noOutline = true;
           quad(p3(w0, yW), p3(w1, yW), p3(o1, yV), p3(o0, yV), [0, -1, 0], c.clone().multiplyScalar(0.6), m);
-          noOutline = false;
+          E.noOutline = false;
         }
         const e = at(tm(uw), 0), eo = at(tm(uw), d), side = [e[0] - at(tm(0), 0)[0], 0, e[1] - at(tm(0), 0)[1]];
         tri(p3(e, yW), p3(eo, yO), p3(eo, yV), side, color, m);
@@ -1884,13 +1650,13 @@ export class Town {
         if (!P) return;
         const p = (i + 3) % 4;
         const pm = { kind: 'pond', v, L: 0, pond: P };
-        noOutline = true;
+        E.noOutline = true;
         quad(p3(C[i], POND_Y), p3(M[i], POND_Y), p3(Q, POND_Y), p3(M[p], POND_Y), [0, 1, 0], POND_COLORS[P.type], pm);
-        noOutline = false;
+        E.noOutline = false;
         // Now and then a firefly spot over the pond water at night
         if (hash(v, quadId, 81) < 0.4) {
           const f = lerp2(C[i], Q, 0.5);
-          R.fx.flies.push({ x: f[0], y: POND_Y, z: f[1], born: P.b });
+          E.R.fx.flies.push({ x: f[0], y: POND_Y, z: f[1], born: P.b });
         }
         const r = (k) => hash(v, k, 71);
         const reedy = P.type === 'lily' || P.type === 'lagoon';
@@ -1918,7 +1684,7 @@ export class Town {
           const pads = 1 + Math.floor(r(6) * 3);
           for (let k = 0; k < pads; k++) lilyPad(offset(C[i], r(7 + k) * 6.28, 0.1 + r(10 + k) * 0.18), POND_Y, r(13 + k) < 0.3, pm);
           if (P.type === 'lagoon' && r(16) < 0.3) {
-            R.fx.boats.push({ x: C[i][0], z: C[i][1], yaw: r(17) * 6.28, seed: r(18), born: P.b, y: POND_Y, s: 0.55 });
+            E.R.fx.boats.push({ x: C[i][0], z: C[i][1], yaw: r(17) * 6.28, seed: r(18), born: P.b, y: POND_Y, s: 0.55 });
           }
         }
         if (reedy && !P.c && r(20) < 0.3) duck(offset(C[i], r(21) * 6.28, 0.12), POND_Y, r(22) * 6.28, pm);
@@ -1987,7 +1753,7 @@ export class Town {
                 color = pickFrom(PLANKS, hash(v, 53));
                 if (firstQuad && I.boat) {
                   const [x, z, yaw] = I.boat;
-                  R.fx.boats.push({ x, z, yaw, seed: hash(v, 54), born: I.b });
+                  E.R.fx.boats.push({ x, z, yaw, seed: hash(v, 54), born: I.b });
                 }
               } else {
                 color = type === 'square' ? PLAZA : GRASS;
@@ -2068,16 +1834,16 @@ export class Town {
               const d = [dir[0] / dl, dir[1] / dl], yc = hC + 0.06;
               box(pos, (hC + hQ) / 2 - 0.1, yc, 0.095, d, wallColor.r + wallColor.g + wallColor.b > 2.6 ? BRICK : wallColor, topMeta);
               box(pos, yc, yc + 0.05, 0.12, d, WHITE, topMeta);
-              noOutline = true;
+              E.noOutline = true;
               box(pos, yc + 0.05, yc + 0.052, 0.065, d, SHADOW, topMeta);
-              noOutline = false;
+              E.noOutline = false;
               // wake: the earliest switch-on order among the house's floors; half the early risers cook breakfast
               let wake = 0;
               for (let l = 0; l <= L; l++) {
                 const o = this.has(v, l) ? infoOf(v, l).info.lit : 0;
                 if (o > 0 && (!wake || o < wake)) wake = o;
               }
-              R.fx.smoke.push({ x: pos[0], y: yc + 0.05, z: pos[1], born: I.b, seed: hash(v, L, 4), wake, breakfast: hash(v, L, 5) < 0.5 });
+              E.R.fx.smoke.push({ x: pos[0], y: yc + 0.05, z: pos[1], born: I.b, seed: hash(v, L, 4), wake, breakfast: hash(v, L, 5) < 0.5 });
             }
           }
 
@@ -2136,9 +1902,9 @@ export class Town {
               face(pts[k], pts[k + 1], yBottom(L), yt, h, wallColor, m, ...bands);
               if (L === 0) {
                 const f = (j, d) => p3([pts[j][0] + nrm[j][0] * d, pts[j][1] + nrm[j][1] * d], 0.02);
-                noOutline = true;
+                E.noOutline = true;
                 quad(f(k, 0.005), f(k + 1, 0.005), f(k + 1, 0.14), f(k, 0.14), [0, 1, 0], FOAM, m);
-                noOutline = false;
+                E.noOutline = false;
               }
             }
           }
@@ -2230,7 +1996,7 @@ export class Town {
         const cached = this.cache.get(q);
         if (cached && cached.sig === sig) return cached;
       }
-      R = { position: [], normal: [], color: [], aPivot: [], aBorn: [], aGlow: [], aWave: [], normals: [], edgeless: [], meta: [], fx: { smoke: [], lamps: [], boats: [], halos: [], glows: [], flies: [] } };
+      const R = E.begin();
       emitQuad(q);
       const rec = this.finishRecord(R, q, cosT);
       rec.sig = sig;
