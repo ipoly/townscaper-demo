@@ -280,6 +280,9 @@ the original Townscaper.
   zoom for smooth mouse wheels that look like trackpads. Option + drag orbits and Cmd or Space +
   drag pans, since trackpads have no middle button. Safari's pinch gestures zoom the camera instead
   of the page.
+- 2026-09-30: phone pinch fix. iOS also sends gesture events for touch pinches, so the Safari
+  pinch handler zoomed on top of OrbitControls and a pinch zoomed twice as far. Gesture events
+  are now ignored while a finger is on the screen.
 
 ## Refactor towards building styles
 

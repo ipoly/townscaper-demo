@@ -1566,9 +1566,14 @@ document.addEventListener('wheel', (e) => {
   controls._rotateLeft(-e.deltaX * k);
   controls._rotateUp(-e.deltaY * k);
 }, { capture: true, passive: false });
-// Safari sends pinches as gesture events instead, and zooms the whole page unless stopped
+// Safari sends trackpad pinches as gesture events instead, and zooms the whole page unless stopped.
+// iOS sends them for touch pinches too, which OrbitControls already zooms from the touches
+const fingers = new Set();
+addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') fingers.add(e.pointerId); }, { capture: true });
+for (const type of ['pointerup', 'pointercancel']) addEventListener(type, (e) => fingers.delete(e.pointerId), { capture: true });
 document.addEventListener('gesturestart', (e) => {
   e.preventDefault();
+  if (fingers.size) return;
   lastInput = now();
   if (orbiting) setOrbit(false);
   pinching = true;
