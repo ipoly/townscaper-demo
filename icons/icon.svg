@@ -20,10 +20,10 @@
   <path d="M244 265 l13 1 l-5 17 Z" fill="#3f7fb5"/>
   <path d="M265 264 l13 -3 l-2 18 Z" fill="#f2c14e"/>
   <path d="M285 254 l11 -7 l1 18 Z" fill="#e2574c"/>
-  <!-- left house: teal, slate roof -->
-  <rect x="80" y="236" width="140" height="156" rx="20" fill="#89d6ce"/>
-  <path d="M150 128 L236 238 L64 238 Z" fill="#5a6f90" stroke="#5a6f90" stroke-width="14" stroke-linejoin="round"/>
-  <rect x="56" y="232" width="188" height="20" rx="10" fill="#4a5c78"/>
+  <!-- left house: mint, navy roof -->
+  <rect x="80" y="236" width="140" height="156" rx="20" fill="#83e4d5"/>
+  <path d="M150 128 L236 238 L64 238 Z" fill="#335189" stroke="#335189" stroke-width="14" stroke-linejoin="round"/>
+  <rect x="56" y="232" width="188" height="20" rx="10" fill="#213d74"/>
   <circle cx="150" cy="280" r="23" fill="#f7f4ee"/>
   <circle cx="150" cy="280" r="14" fill="url(#glass)"/>
   <!-- awning over the door -->
@@ -37,13 +37,13 @@
   <circle cx="199" cy="366" r="13" fill="#6fa35a"/>
   <circle cx="194" cy="361" r="4" fill="#f2a7c3"/>
   <circle cx="205" cy="368" r="4" fill="#f2a7c3"/>
-  <!-- right house: warm sand, red roof -->
-  <rect x="292" y="176" width="144" height="216" rx="20" fill="#fadaaa"/>
+  <!-- right house: apricot, brick roof -->
+  <rect x="292" y="176" width="144" height="216" rx="20" fill="#fcc28d"/>
   <circle cx="420" cy="60" r="14" fill="#f7f4ee" opacity="0.9"/>
   <circle cx="440" cy="36" r="10" fill="#f7f4ee" opacity="0.75"/>
-  <path d="M364 64 L452 178 L276 178 Z" fill="#d35339" stroke="#d35339" stroke-width="14" stroke-linejoin="round"/>
-  <rect x="268" y="172" width="192" height="20" rx="10" fill="#b0402a"/>
-  <rect x="398" y="94" width="28" height="44" fill="#f3a172"/>
+  <path d="M364 64 L452 178 L276 178 Z" fill="#af3d36" stroke="#af3d36" stroke-width="14" stroke-linejoin="round"/>
+  <rect x="268" y="172" width="192" height="20" rx="10" fill="#94221f"/>
+  <rect x="398" y="94" width="28" height="44" fill="#e1a874"/>
   <rect x="392" y="84" width="40" height="14" rx="5" fill="#f7f4ee"/>
   <rect x="362" y="34" width="4" height="24" fill="#3c4450"/>
   <circle cx="364" cy="30" r="8" fill="#e0b84a"/>

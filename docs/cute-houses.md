@@ -178,3 +178,4 @@ the original Townscaper.
    both and the roof is the more visible. (A sunlit-to-shade gradient of the wall alone was tried
    first; it read darker than the walls and looked like a roof color.)
  - Swatches keep the daytime look at dusk and night.
+- 2026-09-30: app icon recolored with two of the new pairs (mint / navy, apricot / brick).
