@@ -270,3 +270,7 @@ the original Townscaper.
   and the MIT license) instead of loading from a CDN, so the town no longer depends on a third-party
   host. The service worker serves vendor/ cache-first; its cache moved to townscaper-v2 so the old
   CDN copies get cleared. The title and app name also dropped the word "Demo".
+- 2026-09-30: a custom cursor over the town. It is a dab of the paint in hand, roof color over wall
+  color like its swatch (a small color wheel for auto), and it changes as colors are picked. Holding
+  Shift turns it into a red eraser ring, dragging the view shows a grabbing hand and orbit mode shows
+  a faint ring. They are native SVG cursors, with 2x images for sharp screens, so they never lag.

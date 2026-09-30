@@ -1279,6 +1279,7 @@ function setOrbit(on) {
   if (on === orbiting) return;
   orbiting = on;
   document.documentElement.classList.toggle('orbit', on);
+  syncCursor();
   controls.autoRotate = on;
   lastInput = now();
   if (on) {
@@ -1557,9 +1558,51 @@ const swatches = [null, ...PALETTE.map((_, i) => i)].map((idx, n) => {
   paletteEl.appendChild(el);
   return { el, idx };
 });
+// --- Canvas cursor: a dab of the paint in hand (roof over wall, like its swatch), a ring while
+// Shift erases, a grabbing hand while the view is dragged and a faint ring while orbiting.
+// Native cursors from SVG, so they never lag behind the mouse ---
+let cursorShift = false, cursorGrab = false;
+const svgUrl = (body, scale) => `url("data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='${24 * scale}' height='${24 * scale}' viewBox='0 0 24 24'>${body}</svg>`)}")`;
+const DAB_SHADOW = "<circle cx='12' cy='13' r='8.5' fill='rgba(0,0,0,0.22)'/>";
+function dabBody() {
+  let paint;
+  if (selectedColor === null) {
+    // Auto: a little color wheel of the palette
+    const hues = [1, 2, 3, 4, 5, 8, 7, 6].map((i) => LIT[i]);
+    paint = hues.map((c, i) => {
+      const a0 = (i / hues.length) * 2 * Math.PI, a1 = ((i + 1) / hues.length) * 2 * Math.PI;
+      const pt = (a) => `${(12 + 7 * Math.sin(a)).toFixed(2)} ${(12 - 7 * Math.cos(a)).toFixed(2)}`;
+      return `<path d='M12 12L${pt(a0)}A7 7 0 0 1 ${pt(a1)}Z' fill='${c}'/>`;
+    }).join('');
+  } else {
+    paint = `<circle cx='12' cy='12' r='7' fill='${LIT[selectedColor]}'/><path d='M5 11A7 7 0 0 1 19 11Z' fill='${LIT_ROOF[selectedColor]}'/>`;
+  }
+  return `${DAB_SHADOW}<circle cx='12' cy='12' r='8.5' fill='#fff'/>${paint}`;
+}
+const ERASE_BODY = `${DAB_SHADOW}<circle cx='12' cy='12' r='7.5' fill='none' stroke='#fff' stroke-width='3'/>
+  <circle cx='12' cy='12' r='7.5' fill='none' stroke='#d9534f' stroke-width='1.5'/><path d='M8.5 12h7' stroke='#d9534f' stroke-width='2' stroke-linecap='round'/>`;
+const ORBIT_BODY = "<circle cx='12' cy='12' r='7' fill='rgba(255,255,255,0.18)' stroke='rgba(255,255,255,0.7)' stroke-width='1.5'/>";
+function syncCursor() {
+  const el = renderer.domElement;
+  if (cursorGrab) { el.style.cursor = 'grabbing'; return; }
+  const body = orbiting ? ORBIT_BODY : cursorShift ? ERASE_BODY : dabBody();
+  el.style.cursor = `${svgUrl(body, 1)} 12 12, crosshair`;
+  // Sharp on high-density screens where image-set is understood; ignored (keeping the line above) elsewhere
+  el.style.cursor = `image-set(${svgUrl(body, 1)} 1x, ${svgUrl(body, 2)} 2x) 12 12, crosshair`;
+}
+for (const type of ['keydown', 'keyup']) {
+  addEventListener(type, (e) => { if (e.shiftKey !== cursorShift) { cursorShift = e.shiftKey; syncCursor(); } });
+}
+addEventListener('blur', () => { cursorShift = false; syncCursor(); });
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' && e.button !== 0) { cursorGrab = true; syncCursor(); }
+});
+addEventListener('pointerup', () => { if (cursorGrab) { cursorGrab = false; syncCursor(); } });
 function selectColor(idx) {
   selectedColor = idx;
   for (const s of swatches) s.el.classList.toggle('active', s.idx === idx);
+  syncCursor();
 }
 selectColor(null);
 
