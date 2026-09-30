@@ -1278,7 +1278,7 @@ let orbiting = false, lastInput = now(), orbitNext = 0, gridWasOn = true, swallo
 function setOrbit(on) {
   if (on === orbiting) return;
   orbiting = on;
-  document.body.classList.toggle('orbit', on);
+  document.documentElement.classList.toggle('orbit', on);
   controls.autoRotate = on;
   lastInput = now();
   if (on) {

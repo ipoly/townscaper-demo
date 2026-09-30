@@ -264,6 +264,8 @@ the original Townscaper.
    circling (and hides the hover highlight); a press, wheel or key wakes it, and that input does
    nothing else. The cursor stays visible while orbiting.
  - The help panel starts closed unless it was left open last time.
+ - The orbit class lives on <html> and the inline head script sets it before the first paint, so
+   the UI never flashes up while main.js is still loading.
 - 2026-09-30: Three.js r170 now ships with the app in vendor/three (the minified build, OrbitControls
   and the MIT license) instead of loading from a CDN, so the town no longer depends on a third-party
   host. The service worker serves vendor/ cache-first; its cache moved to townscaper-v2 so the old

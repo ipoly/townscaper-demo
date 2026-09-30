@@ -134,7 +134,7 @@
       opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none;
     }
     /* Orbit mode: only the town */
-    body.orbit :is(#tools, #palette, #help, #help-open, #modes, #toast) { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.8s !important; }
+    .orbit :is(#tools, #palette, #help, #help-open, #modes, #toast) { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.8s !important; }
     #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
     #flash.flash { animation: flash 0.35s ease-out; }
     @keyframes flash { from { opacity: 0.7; } to { opacity: 0; } }
@@ -195,6 +195,8 @@
     {
       const h = new Date().getHours();
       document.documentElement.dataset.mood = h >= 5 && h < 8 ? 'Dawn' : h >= 8 && h < 17 ? 'Day' : h >= 17 && h < 20 ? 'Dusk' : 'Night';
+      // Every visit opens in orbit mode, so the UI starts out of the way instead of fading out
+      document.documentElement.classList.add('orbit');
     }
   </script>
   <script type="importmap">
