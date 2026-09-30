@@ -52,7 +52,7 @@ the original Townscaper.
 
 ### Phase 6: window and wall charm
 
-- [x] Glass with a sky gradient and slanted glints
+- [x] Glass with a sky gradient (slanted glints tried and dropped)
 - [x] Tied-back curtains in some windows
 - [x] Ivy climbing some ground-floor walls
 
@@ -112,10 +112,10 @@ the original Townscaper.
    use the averaged direction and are stretched along the bend onto the mitre plane, so the roof and
    eave segments of a hip share their joint ring and the cap no longer narrows or steps there.
 - 2026-09-30: phase 6 done.
- - Glass: `skyGlass()` brightens panes towards the top through `shadeFn`; `glint()` adds two slanted
-   `GLINT` strips on one world-consistent side of each window (plain, arched). Portholes get the
-   gradient only. Glints and curtains glow with the window at night.
+ - Glass: `skyGlass()` brightens panes towards the top through `shadeFn`. Curtains glow with the
+   window at night.
  - Curtains: ~40% of the plain and ~30% of the arched windows get tied-back `CURTAINS` drapes at both
    outer pane edges.
  - Ivy: ~22% of the outer ground-floor walls get a patch of `IVY` leaf blobs near one corner, wide at
    the foot and narrowing upwards, reaching into the next floor when there is one.
+- 2026-09-30: window glints removed; the slanted strips read as clutter rather than reflections.

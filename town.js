@@ -37,7 +37,6 @@ const GRASS = new THREE.Color('#9cc27a');
 const ROOF_FLAT = new THREE.Color('#a39a92');
 const GARDEN = new THREE.Color('#86b36a');
 const WINDOW = new THREE.Color('#3b4a5a');
-const GLINT = new THREE.Color('#7f98ad');
 const CURTAINS = ['#f4eee2', '#f6d9d2', '#e3eef0'].map((c) => new THREE.Color(c));
 const IVY = ['#4f8a45', '#5f9a4c', '#467d3e'].map((c) => new THREE.Color(c));
 const WHITE = new THREE.Color('#f7f4ee');
@@ -804,7 +803,7 @@ export class Town {
       const n = [nx / len, ny / len, nz / len];
       const pv = this.pivot(m.v, m.L);
       const cell = m.pond ?? infoOf(m.v, m.L).info;
-      const glow = color === LAMP ? 1 : color === WINDOW || color === GLINT || CURTAINS.includes(color) ? cell.lit : 0;
+      const glow = color === LAMP ? 1 : color === WINDOW || CURTAINS.includes(color) ? cell.lit : 0;
       for (const p of [a, b, c]) {
         R.position.push(p[0], p[1], p[2]);
         R.normal.push(n[0], n[1], n[2]);
@@ -1492,18 +1491,6 @@ export class Town {
       };
       // Glass reflects the sky: panes brighten towards the top
       const skyGlass = (yA, yB) => { shadeFn = (pt) => 1 + 0.6 * Math.max(0, Math.min(1, (pt[1] - yA) / (yB - yA))); };
-      // Signed distance from the face center along a fixed world direction, so both halves agree
-      const side = (() => { const d = [b[0] - a[0], b[1] - a[1]]; return d[0] * -towards[2] + d[1] * towards[0] > 0 === aIsM ? 1 : -1; })();
-      // Diagonal glint on one side of a pane, x in world units from the face center
-      const glint = (yA, yT) => {
-        const H = yT - yA;
-        for (const [x0, wd, t0] of [[-0.12, 0.03, 0.35], [-0.065, 0.014, 0.55]]) {
-          const pt = (x, y) => p3(at(tm(Math.max(0, x * side) / len), 0.014), y);
-          const yb = yA + H * t0, yt = yT - 0.02, dx = (yt - yb) * 0.25;
-          if (Math.min(x0 * side, (x0 + wd + dx) * side) < 0) continue; // the other half draws it
-          quad(pt(x0, yb), pt(x0 + wd, yb), pt(x0 + wd + dx, yt), pt(x0 + dx, yt), towards, GLINT, m);
-        }
-      };
       // Curtain gathered at the outer edge of a pane, tied back halfway down
       const curtain = (hw, yA, yT, c) => {
         const w = U(hw), yM = yA + (yT - yA) * 0.45;
@@ -1519,7 +1506,6 @@ export class Town {
         rect(tm(0), tm(w), h0, ys - y0, WINDOW, 0.004);
         if (round) fan(ys, hw, 0, Math.PI / 2, 0.012, WINDOW);
         shadeFn = null;
-        glint(yA, round ? ys + 0.04 : yB);
         if (drape) curtain(hw, yA, ys, drape);
         slab(w, w + f, 0.035, yA, ys, WHITE);
         slab(0, w + f + U(0.02), 0.06, yA - FRAME, yA, WHITE); // sill
