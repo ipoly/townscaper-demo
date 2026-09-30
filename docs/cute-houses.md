@@ -207,3 +207,7 @@ the original Townscaper.
  - Night: a few fireflies over pond water, each glowing for about a third of a 9-16 s cycle and then
    fading away to come back somewhere nearby.
  - Both are a single draw each, animated in the vertex shader, with no full-screen pass.
+- 2026-09-30: drifting mist under the dawn light shafts.
+ - Four stacked horizontal sheets over the town, low to mid height, carrying soft noise that drifts
+   slowly and fades out at the edges, tinted from the sky toward the sun.
+ - Only drawn at dawn (one extra draw call), so the shafts have something in the air to light up.

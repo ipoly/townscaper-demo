@@ -342,6 +342,40 @@ rays.raycast = () => {};
 scene.add(rays);
 const townBox = new THREE.Box3();
 
+// Dawn mist: a few thin layers of drifting noise low over the water, so the shafts have air to light up.
+// Stacked thin layers soften the line where the mist meets a wall without needing a depth texture
+const MIST_LAYERS = [0.06, 0.22, 0.4, 0.6], MIST_MARGIN = 7;
+const mistMaterial = new THREE.ShaderMaterial({
+  uniforms: { uTime, uRays, uMistColor: { value: new THREE.Color() } },
+  vertexShader: `attribute vec2 aLocal; attribute float aLayer;
+varying vec2 vLocal, vWorld; varying float vLayer;
+void main() {
+  vLocal = aLocal; vWorld = position.xz; vLayer = aLayer;
+  gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
+}`,
+  fragmentShader: `uniform float uTime, uRays; uniform vec3 uMistColor;
+varying vec2 vLocal, vWorld; varying float vLayer;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+void main() {
+  vec2 p = vWorld * 0.22 + vec2(uTime * 0.025, uTime * 0.012) * (1.0 + vLayer) + vLayer * 7.3;
+  float n = noise(p) * 0.6 + noise(p * 2.3 + 4.1) * 0.4;
+  float edge = 1.0 - smoothstep(0.55, 1.0, length(vLocal));
+  float a = uRays * smoothstep(0.3, 0.8, n) * edge * mix(0.16, 0.07, vLayer / 3.0);
+  gl_FragColor = vec4(uMistColor, a);
+}`,
+  transparent: true, depthWrite: false, side: THREE.DoubleSide,
+});
+const mist = new THREE.Mesh(new THREE.BufferGeometry(), mistMaterial);
+mist.frustumCulled = false;
+mist.raycast = () => {};
+mist.renderOrder = 1;
+scene.add(mist);
+
 // Shafts land at fixed pseudo-random spots over the town's footprint
 function syncRays() {
   townBox.setFromObject(townGroup);
@@ -365,6 +399,26 @@ function syncRays() {
   g.setIndex(index);
   rays.geometry.dispose();
   rays.geometry = g;
+
+  const cx = (townBox.min.x + townBox.max.x) / 2, cz = (townBox.min.z + townBox.max.z) / 2;
+  const hx = (townBox.max.x - townBox.min.x) / 2 + MIST_MARGIN, hz = (townBox.max.z - townBox.min.z) / 2 + MIST_MARGIN;
+  const mpos = [], mlocal = [], mlayer = [], mindex = [];
+  MIST_LAYERS.forEach((y, k) => {
+    const base = mpos.length / 3;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      mpos.push(cx + sx * hx, y, cz + sz * hz);
+      mlocal.push(sx, sz);
+      mlayer.push(k);
+    }
+    mindex.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  });
+  const mg = new THREE.BufferGeometry();
+  mg.setAttribute('position', new THREE.Float32BufferAttribute(mpos, 3));
+  mg.setAttribute('aLocal', new THREE.Float32BufferAttribute(mlocal, 2));
+  mg.setAttribute('aLayer', new THREE.Float32BufferAttribute(mlayer, 1));
+  mg.setIndex(mindex);
+  mist.geometry.dispose();
+  mist.geometry = mg;
 }
 
 // --- Fireflies: small blinking points wandering over the ponds at night ---
@@ -1325,7 +1379,8 @@ renderer.setAnimationLoop(() => {
   beamGroup.visible = beam.value > 0.002;
   halos.visible = glows.visible = uNight.value > 0.01;
   fireflies.visible = uNight.value > 0.55;
-  rays.visible = uRays.value > 0.01;
+  rays.visible = mist.visible = uRays.value > 0.01;
+  mistMaterial.uniforms.uMistColor.value.copy(scene.background).lerp(sun.color, 0.25);
   uSunDir.value.copy(sun.position).normalize();
   for (const l of lamps) {
     l.g.rotation.y = t * 0.8 + l.phase;
