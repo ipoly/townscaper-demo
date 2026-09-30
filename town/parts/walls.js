@@ -115,8 +115,8 @@ export function wallParts(ctx) {
     if (terrace) fence(at(0, -0.04), at(1, -0.04), y1, WHITE, m);
     const h = hash(v, L, target);
     const facesPlaza = L === 1 && !town.has(target, 1) && town.has(target, 0);
-    if (style === 'lighthouse') {
-      if (h < 0.5) rect(0.42, 0.58, 0.32, 0.5, WINDOW);
+    if (style === 'lighthouse' && kit.tower.top !== 'pagoda') {
+      if (h < 0.5) rect(0.42, 0.58, 0.32, 0.5, GLASS);
       return;
     }
     // Windows are centered on the whole face: this half draws u = 0..w and the neighbouring
@@ -192,6 +192,12 @@ export function wallParts(ctx) {
       rect(tm(0), tm(U(bw)), hc - r, hc + r, TRIM, 0.015);
       for (const dy of [-r / 2, 0, r / 2]) rect(tm(0), tm(U(Math.sqrt(r * r - dy * dy))), hc + dy - bw, hc + dy + bw, TRIM, 0.015);
     };
+    if (style === 'lighthouse') {
+      // Pagoda: a lacquered column at each corner and a lattice window on every face
+      box(at(tm(1), 0), y0, y1, 0.04, dirAlong(), TRIM, m);
+      window1(0.12, 0.18, 0.5);
+      return;
+    }
     // Flower box hanging under a window's sill: this half fills u = 0..uw
     const flowerBox = (uw, yS, seed) => {
       slab(0, uw, 0.1, yS - 0.08, yS + 0.005, seed < 0.5 ? TERRACOTTA : WHITE);

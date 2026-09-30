@@ -1,11 +1,11 @@
 // Roof pieces beyond the slopes themselves: overhanging eaves, dormers, roofs over walkways.
 
-import { EAVE, EAVE_DROP, EAVE_RIM, WINDOW, GOLD, SLATE, LAMP, WOOD } from '../constants.js';
+import { EAVE, EAVE_DROP, EAVE_RIM, RIDGE_R, WINDOW, GOLD, SLATE, LAMP, WOOD } from '../constants.js';
 import { p3, lerp2 } from '../emitter.js';
 
 // ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function roofParts(ctx) {
-  const { E, tri, quad, blob, box, prism, cone, bar, kit, redLantern } = ctx;
+  const { E, tri, quad, blob, box, prism, cone, bar, ridgeCap, kit, redLantern } = ctx;
   const ROOFS = kit.roofs;
 
   // Overhanging eaves where roof quadrant i meets an outer wall: a thick wedge carrying the
@@ -15,11 +15,13 @@ export function roofParts(ctx) {
   // eaved[k]: quadrant k gets eaves too, otherwise the open end of the wedge is capped.
   // Flared eaves (the kit's eaves) reach further and droop less, and where two walls of the
   // quadrant meet at an outer corner their outer edge rises towards it, by lift at the tip.
+  // shape: { out, drop } in place of the kit's reach and droop.
   const F = kit.eaves, EV = F ? F.out : EAVE, DROP = F ? F.drop : EAVE_DROP;
-  const eaves = (i, C, M, Q, occ, eaved, arc, y, color, m) => {
+  const eaves = (i, C, M, Q, occ, eaved, arc, y, color, m, shape) => {
+    const ev = shape ? shape.out : EV, drop = shape ? shape.drop : DROP;
     const unit = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
-    const out = (p, d) => [p[0] + d[0] * EV, p[1] + d[1] * EV];
-    const yo = y - DROP, yb = yo - EAVE_RIM;
+    const out = (p, d) => [p[0] + d[0] * ev, p[1] + d[1] * ev];
+    const yo = y - drop, yb = yo - EAVE_RIM;
     const shade = color.clone().multiplyScalar(0.55);
     // Wedge from wall top A->B out to Ao->Bo, its outer edge raised by la and lb at the two ends
     const strip = (A, B, Ao, Bo, la = 0, lb = 0) => {
@@ -53,7 +55,7 @@ export function roofParts(ctx) {
       if (Math.abs(det) < 0.15) return null;
       const t = ((l2.p[0] - l1.p[0]) * l2.d[1] - (l2.p[1] - l1.p[1]) * l2.d[0]) / det;
       const x = [l1.p[0] + l1.d[0] * t, l1.p[1] + l1.d[1] * t];
-      return Math.hypot(x[0] - Q[0], x[1] - Q[1]) < EV * 3 ? x : null;
+      return Math.hypot(x[0] - Q[0], x[1] - Q[1]) < ev * 3 ? x : null;
     };
     const n = (i + 1) % 4, p = (i + 3) % 4;
     const mOut = (k, j) => out(M[k], unit(C[i], C[j]));
@@ -92,6 +94,29 @@ export function roofParts(ctx) {
       return;
     }
     blob([c2[0], y + 0.1, c2[1]], 0.04, 1, GOLD, m);
+  };
+
+  // Pagoda floors: a steep skirt roof round the tower just above each floor, its corners turned
+  // up with a ridge cap and a red lantern hanging from the tip
+  const SKIRT = { out: 0.2, drop: 0.16 };
+  const pagodaSkirt = (i, C, M, Q, occ, yt, m) => {
+    const y = yt + 0.1, color = kit.tower.roof, p = (i + 3) % 4;
+    eaves(i, C, M, Q, occ, occ, null, y, color, m, SKIRT);
+    const dl = Math.hypot(Q[0] - C[i][0], Q[1] - C[i][1]) || 1, d = [(Q[0] - C[i][0]) / dl, (Q[1] - C[i][1]) / dl];
+    const wl = Math.hypot(M[p][0] - Q[0], M[p][1] - Q[1]) || 1, wn = [(M[p][1] - Q[1]) / wl, -(M[p][0] - Q[0]) / wl];
+    const t = Math.min(SKIRT.out * 1.6, SKIRT.out / Math.max(Math.abs(d[0] * wn[0] + d[1] * wn[1]), 0.3));
+    const yTip = y - SKIRT.drop + (F ? F.lift : 0), at = (s) => [Q[0] + d[0] * s, Q[1] + d[1] * s];
+    ridgeCap([p3(Q, y), p3(at(t), yTip), p3(at(t + 0.05), yTip + 0.07)], RIDGE_R, color.clone().multiplyScalar(1.06), m, true);
+    const hook = at(t - 0.02);
+    if (kit.lanterns === 'red') redLantern([hook[0], yTip, hook[1]], 0.035, m);
+  };
+
+  // Pagoda top: stacked gold rings on a mast, crowned by the finial
+  const pagodaSpire = (c2, y, m) => {
+    prism(c2, 0.07, y - 0.04, y + 0.04, 8, GOLD, m);
+    prism(c2, 0.012, y + 0.04, y + 0.4, 4, GOLD, m);
+    for (let k = 0; k < 5; k++) prism(c2, 0.055 - k * 0.007, y + 0.09 + k * 0.055, y + 0.11 + k * 0.055, 8, GOLD, m);
+    finial(c2, y + 0.4, m);
   };
 
   // Dormer on a roof slope at c2 whose roof height is y, facing dir
@@ -138,5 +163,5 @@ export function roofParts(ctx) {
     }
   };
 
-  return { eaves, finial, dormer, canopy };
+  return { eaves, finial, pagodaSkirt, pagodaSpire, dormer, canopy };
 }

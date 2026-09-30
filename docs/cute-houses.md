@@ -334,3 +334,10 @@ step keeps the geometry byte for byte the same.
   A gazebo turns into a pavilion: its pyramid reaches out past the posts with lifted corners, a
   red lantern hangs inside and a gourd crowns it. Dormers, chimneys and the lighthouse are still
   european.
+- 2026-09-30: stage 3, the pagoda. Kits now describe the tall tower by the water (`tower`): the
+  european one keeps its red and white lighthouse, the chinese one becomes a whitewashed pagoda
+  with a lacquered column at every corner, a lattice window on every face and a steep skirt roof
+  above each floor whose corners turn up under a ridge cap, with a red lantern hanging from each
+  tip. The top gets a flared pointed roof and a mast of gold rings under a gourd, and no lamp
+  beam. Row houses drop their dormers in the chinese style (`dormers`). Horse-head gable walls
+  are still an option for later.

@@ -48,15 +48,15 @@
   "tris": 61335
  },
  "chinese:showcase": {
-  "hash": "7d2a096d00a45ec1",
-  "tris": 56774
+  "hash": "65eac5fa3b141fcb",
+  "tris": 56598
  },
  "chinese:seed7": {
-  "hash": "6879e221dfd73679",
-  "tris": 20981
+  "hash": "637becdd3c4e0c88",
+  "tris": 24846
  },
  "chinese:fuzz11": {
-  "hash": "80106ba6d51b89d1",
-  "tris": 69890
+  "hash": "e9f5077eecde3adc",
+  "tris": 84389
  }
 }

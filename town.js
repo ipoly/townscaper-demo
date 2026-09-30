@@ -8,7 +8,7 @@
 // an edit only re-emits the quads whose inputs actually changed.
 
 import * as THREE from 'three';
-import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, ARCH_RISE, DECK, POND_Y, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, LACQUER, GRANITE, yBottom, yTop, hash, pickFrom, PALETTE_SIZE } from './town/constants.js';
+import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, ARCH_RISE, DECK, POND_Y, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, SLATE, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, LACQUER, GRANITE, yBottom, yTop, hash, pickFrom, PALETTE_SIZE } from './town/constants.js';
 import { STYLES, DEFAULT_STYLE } from './town/styles/index.js';
 import { Emitter, p3, lerp2, offset } from './town/emitter.js';
 import { propParts } from './town/parts/props.js';
@@ -199,7 +199,7 @@ export class Town {
   roofRise(v, L, units) {
     if (L === 0 || units.bridge.has(this.key(v, L)) || units.terrace.has(this.key(v, L))) return 0;
     if (this.coverGap(v, L, units)) return 0;
-    if (units.lighthouse.get(v) === L) return 0;
+    if (units.lighthouse.get(v) === L) return this.kit.tower.rise;
     if (L >= 3 && hash(v, L, 5) < 0.45 && this.grid.neighbors[v].every((u) => !this.has(u, L))) return this.kit.spireRise;
     return ROOF_RISE;
   }
@@ -760,7 +760,7 @@ export class Town {
     const stoneSpan = (I, L) => kit.stoneBridges && L === 1 && I.br && I.bs === 'w';
     const ctx = { E, tri, quad, blob, box, prism, cone, bar: E.bar, ridgeCap, sagString, hanging, town: this, kit, verts, units, infoOf, stoneSpan };
     for (const make of [propParts, landmarkParts, roofParts, carryParts, wallParts]) Object.assign(ctx, make(ctx));
-    const { fountain, tree, fence, plants, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, finial, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
+    const { fountain, tree, fence, plants, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, finial, pagodaSkirt, pagodaSpire, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
 
     const emitQuad = (q) => {
       const C = q.map((v) => verts[v]);
@@ -770,7 +770,7 @@ export class Town {
       const styleOf = (I) => (I.st === 'g' ? (I.gt === 'dock' ? 'dock' : 'ground')
         : I.st === 'l' ? 'lighthouse' : 'normal');
       const wallColorOf = (I, L, style = styleOf(I)) => (L === 0 ? (style === 'dock' ? WOOD : STONE)
-        : style === 'lighthouse' ? (L % 2 ? WHITE : LH_RED) : WALLS[I.ci]);
+        : style === 'lighthouse' ? kit.tower.walls[L % 2] : WALLS[I.ci]);
       // Outer corners of houses standing on the floor below are rounded: quadrant i's two walls
       // meet the quad center on an arc tangent to both. Returns its points from the wall towards
       // n to the wall towards p, with outward normals, or null when the corner stays sharp.
@@ -875,7 +875,7 @@ export class Town {
         const firstRidge = ridge.indexOf(true);
         // Covered porch under a block hovering over the column
         const porch = inf.map((I, i) => top[i] && !br[i] && !I.tr && !!I.cv && L > 0 && styleOf(I) === 'normal');
-        const eaved = inf.map((I, i) => ridge[i] && L > 0 && I.r > 0 && !I.lt);
+        const eaved = inf.map((I, i) => ridge[i] && L > 0 && I.r > 0 && (!I.lt || !!kit.tower.roof));
 
         for (let i = 0; i < 4; i++) {
           if (!occ[i]) continue;
@@ -889,6 +889,10 @@ export class Town {
           const arc = cornerArc(i, L);
           // Outline of the quadrant's top from M[i] round the quad center to M[p]
           const rim = (hN, hQ, hP) => [[M[i], hN], ...(arc ? arc.pts : [Q]).map((pt) => [pt, hQ]), [M[p], hP]];
+          // A pagoda floor with the tower going on above and nothing beside it gets a skirt roof
+          if (!top[i] && L > 0 && I.st === 'l' && kit.tower.roof && q.every((u, j) => j === i || (!occ[j] && !this.has(u, L + 1)))) {
+            pagodaSkirt(i, C, M, Q, occ, yt, topMeta);
+          }
 
           if (top[i] && br[i]) {
             const yd = yBottom(L);
@@ -933,7 +937,7 @@ export class Town {
                 }
               }
             } else if (I.lt) {
-              color = WHITE;
+              color = kit.tower.roof ?? WHITE;
             } else if (allHigh) {
               color = I.gd ? GARDEN : ROOF_FLAT;
             } else {
@@ -973,12 +977,12 @@ export class Town {
               }
             }
 
-            if (firstQuad && I.lt) lighthouseTop(C[i], hC, topMeta);
+            if (firstQuad && I.lt) (kit.tower.top === 'pagoda' ? pagodaSpire : lighthouseTop)(C[i], hC, topMeta);
             // Gold ball on a stem crowning a lone pointed roof
-            if (firstQuad && eaved[i] && !allHigh && this.grid.neighbors[v].every((u) => !this.has(u, L))) finial(C[i], hC, topMeta);
+            else if (firstQuad && eaved[i] && !allHigh && this.grid.neighbors[v].every((u) => !this.has(u, L))) finial(C[i], hC, topMeta);
             const isRow = I.ut === 'row';
             const dormerQuad = this.vertexQuads[v][Math.floor(this.vertexQuads[v].length / 2)];
-            if (isRow && !allHigh && q === dormerQuad && hash(v, L, 41) < 0.8) {
+            if (kit.dormers && isRow && !allHigh && q === dormerQuad && hash(v, L, 41) < 0.8) {
               const dir = [Q[0] - C[i][0], Q[1] - C[i][1]];
               const dl = Math.hypot(dir[0], dir[1]) || 1;
               dormer(lerp2(C[i], Q, 0.5), (hC + hQ) / 2, [dir[0] / dl, dir[1] / dl], wallColor, topMeta);
