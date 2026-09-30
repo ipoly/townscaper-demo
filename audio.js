@@ -87,23 +87,32 @@ export class Sfx {
     osc.stop(t + 0.2);
   }
 
-  // Camera shutter: two short bursts of bandpassed noise, click then clack
+  // Camera shutter: click then clack, each a burst of bandpassed noise over a short falling knock
   shutter() {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.05), ctx.sampleRate);
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.12), ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    for (const [at, f, v] of [[0, 3200, 0.35], [0.07, 1800, 0.28]]) {
+    for (const [at, f, v] of [[0, 2600, 0.55], [0.09, 1500, 0.45]]) {
       const src = ctx.createBufferSource(), band = ctx.createBiquadFilter(), gain = ctx.createGain();
       src.buffer = buf;
       band.type = 'bandpass';
       band.frequency.value = f;
-      band.Q.value = 1.2;
+      band.Q.value = 0.7;
       gain.gain.setValueAtTime(v, t + at);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.045);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.1);
       src.connect(band).connect(gain).connect(this.master);
       src.start(t + at);
+      const osc = ctx.createOscillator(), knock = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f / 3, t + at);
+      osc.frequency.exponentialRampToValueAtTime(f / 8, t + at + 0.06);
+      knock.gain.setValueAtTime(0.2, t + at);
+      knock.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.08);
+      osc.connect(knock).connect(this.master);
+      osc.start(t + at);
+      osc.stop(t + at + 0.1);
     }
   }
 
