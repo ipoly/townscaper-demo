@@ -1,6 +1,6 @@
 // Southern Chinese water town: whitewashed and earth-toned walls under grey tiles, with a few
 // vermilion walls and glazed roofs for temples; lacquered lattice windows backed with paper,
-// red studded doors, red lanterns and granite arch bridges. See european.js for the kit fields.
+// red studded doors, red lanterns and granite arch bridges, under flared eaves with upturned corners. See european.js for the kit fields.
 import * as THREE from 'three';
 import { LACQUER, PAPER } from '../constants.js';
 
@@ -23,4 +23,8 @@ export default {
   stripes: false,
   lanterns: 'red',
   stoneBridges: true,
+  eaves: { out: 0.17, drop: 0.045, lift: 0.12 },
+  squareCorners: true,
+  spireRise: 0.8,
+  finial: 'gourd',
 };

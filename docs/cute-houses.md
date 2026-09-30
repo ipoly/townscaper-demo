@@ -326,3 +326,11 @@ step keeps the geometry byte for byte the same.
   glow at night like glass and lamps. The style is town-wide: a toolbar button and B cycle it, new
   islands keep it, and links carry `&style=chinese` (left out for the default, so old links stay
   the same). The snapshot test also builds three towns in every other style.
+- 2026-09-30: stage 2, roofs. The kit's `eaves` makes the overhang reach further and droop
+  less, and where a roof quadrant turns an outer corner the outer edge of both eave strips rises
+  along a quadratic curve to an upturned tip; the slopes themselves stay flat, so every roof
+  shape keeps working. Hip ridges end in a small curl at those corners, corners stay square
+  instead of rounding off, lone spires rise lower, and their gold ball becomes a gourd finial.
+  A gazebo turns into a pavilion: its pyramid reaches out past the posts with lifted corners, a
+  red lantern hangs inside and a gourd crowns it. Dormers, chimneys and the lighthouse are still
+  european.

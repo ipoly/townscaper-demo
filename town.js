@@ -8,7 +8,7 @@
 // an edit only re-emits the quads whose inputs actually changed.
 
 import * as THREE from 'three';
-import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, SPIRE_RISE, ARCH_RISE, DECK, POND_Y, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, GOLD, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, LACQUER, GRANITE, yBottom, yTop, hash, pickFrom, PALETTE_SIZE } from './town/constants.js';
+import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, ARCH_RISE, DECK, POND_Y, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, LACQUER, GRANITE, yBottom, yTop, hash, pickFrom, PALETTE_SIZE } from './town/constants.js';
 import { STYLES, DEFAULT_STYLE } from './town/styles/index.js';
 import { Emitter, p3, lerp2, offset } from './town/emitter.js';
 import { propParts } from './town/parts/props.js';
@@ -200,7 +200,7 @@ export class Town {
     if (L === 0 || units.bridge.has(this.key(v, L)) || units.terrace.has(this.key(v, L))) return 0;
     if (this.coverGap(v, L, units)) return 0;
     if (units.lighthouse.get(v) === L) return 0;
-    if (L >= 3 && hash(v, L, 5) < 0.45 && this.grid.neighbors[v].every((u) => !this.has(u, L))) return SPIRE_RISE;
+    if (L >= 3 && hash(v, L, 5) < 0.45 && this.grid.neighbors[v].every((u) => !this.has(u, L))) return this.kit.spireRise;
     return ROOF_RISE;
   }
 
@@ -760,7 +760,7 @@ export class Town {
     const stoneSpan = (I, L) => kit.stoneBridges && L === 1 && I.br && I.bs === 'w';
     const ctx = { E, tri, quad, blob, box, prism, cone, bar: E.bar, ridgeCap, sagString, hanging, town: this, kit, verts, units, infoOf, stoneSpan };
     for (const make of [propParts, landmarkParts, roofParts, carryParts, wallParts]) Object.assign(ctx, make(ctx));
-    const { fountain, tree, fence, plants, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
+    const { fountain, tree, fence, plants, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, finial, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
 
     const emitQuad = (q) => {
       const C = q.map((v) => verts[v]);
@@ -782,7 +782,7 @@ export class Town {
         if (L === 0) {
           if (styleOf(I) !== 'ground' || [1, 2, 3].some((d) => units.ponds.has(q[(i + d) % 4]))) return null;
           if (this.has(q[i], 1) && !cornerArc(i, 1)) return null;
-        } else if (I.br || styleOf(I) !== 'normal') return null;
+        } else if (I.br || styleOf(I) !== 'normal' || kit.squareCorners) return null;
         const p = (i + 3) % 4;
         const l1 = Math.hypot(M[i][0] - Q[0], M[i][1] - Q[1]), l2 = Math.hypot(M[p][0] - Q[0], M[p][1] - Q[1]);
         const e1 = [(M[i][0] - Q[0]) / l1, (M[i][1] - Q[1]) / l1], e2 = [(M[p][0] - Q[0]) / l2, (M[p][1] - Q[1]) / l2];
@@ -961,8 +961,12 @@ export class Town {
                     const dl = Math.hypot(Q[0] - C[i][0], Q[1] - C[i][1]) || 1, d = [(Q[0] - C[i][0]) / dl, (Q[1] - C[i][1]) / dl];
                     const wl = Math.hypot(wm[0] - Q[0], wm[1] - Q[1]) || 1, wn = [(wm[1] - Q[1]) / wl, -(wm[0] - Q[0]) / wl];
                     const cos = Math.abs(d[0] * wn[0] + d[1] * wn[1]);
-                    const t = Math.min(EAVE * 1.6, EAVE / Math.max(cos, 0.3));
-                    pts.push(p3([Q[0] + d[0] * t, Q[1] + d[1] * t], yt - EAVE_DROP));
+                    const F = kit.eaves, ev = F ? F.out : EAVE;
+                    const t = Math.min(ev * 1.6, ev / Math.max(cos, 0.3));
+                    // Flared eaves turn up at an outer corner, and the hip curls on past the tip
+                    const lift = F && !occ[n] && !occ[p] ? F.lift : 0;
+                    pts.push(p3([Q[0] + d[0] * t, Q[1] + d[1] * t], yt - (F ? F.drop : EAVE_DROP) + lift));
+                    if (lift) pts.push(p3([Q[0] + d[0] * (t + 0.05), Q[1] + d[1] * (t + 0.05)], yt - F.drop + lift + 0.07));
                   }
                 }
                 ridgeCap(pts, RIDGE_R, cap, topMeta, true);
@@ -971,10 +975,7 @@ export class Town {
 
             if (firstQuad && I.lt) lighthouseTop(C[i], hC, topMeta);
             // Gold ball on a stem crowning a lone pointed roof
-            if (firstQuad && eaved[i] && !allHigh && this.grid.neighbors[v].every((u) => !this.has(u, L))) {
-              box(C[i], hC - 0.02, hC + 0.07, 0.012, [1, 0], SLATE, topMeta);
-              blob([C[i][0], hC + 0.1, C[i][1]], 0.04, 1, GOLD, topMeta);
-            }
+            if (firstQuad && eaved[i] && !allHigh && this.grid.neighbors[v].every((u) => !this.has(u, L))) finial(C[i], hC, topMeta);
             const isRow = I.ut === 'row';
             const dormerQuad = this.vertexQuads[v][Math.floor(this.vertexQuads[v].length / 2)];
             if (isRow && !allHigh && q === dormerQuad && hash(v, L, 41) < 0.8) {
