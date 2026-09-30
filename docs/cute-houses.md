@@ -31,6 +31,13 @@ the original Townscaper.
 - [~] Rounded ridges and eaves (eaves follow rounded corners; hip ridges deferred)
 - [x] Simple vertex AO (wall feet, under eaves) to replace outlines
 
+### Phase 3: rounded base and small props
+
+- [x] Rounded foundation corners (quay stones and foam follow the arc)
+- [x] Flower boxes under some windows
+- [x] Striped awnings over some doors
+- [ ] Rounded ridge caps on hip roofs (deferred)
+
 ## Progress log
 
 - 2026-09-30: diagnosis done; starting phase 1 items 1-3.
@@ -57,3 +64,12 @@ the original Townscaper.
  - AO: walls are split into bands (`AO_BAND`); vertices at wall feet (`AO_FOOT`) and under eaves
    (`AO_EAVES`) are darkened through `shadeFn` in `tri()`.
  - Known leftovers: ground-floor and walkway corners stay sharp; hip ridges are not rounded.
+- 2026-09-30: phase 3 done (except rounded hip ridges).
+ - Foundations: `cornerArc()` also rounds isolated ground quadrants at L0 (no pond next to them),
+   unless the house above keeps its corner square. The foam ring stops at the arc and follows it.
+ - Flower boxes: `flowerBox()` hangs a terracotta or white box with leaves and blooms under ~45% of
+   the plain windows.
+ - Awnings: `awning()` puts a striped awning (sloped stripes, valance, shaded underside) over ~55% of
+   the plaza doors.
+ - Known leftovers: a house on a square foundation can still round its own corner (a ledge fills the
+   step); hip ridge caps stay sharp.

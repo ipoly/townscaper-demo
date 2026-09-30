@@ -1407,7 +1407,10 @@ export class Town {
         // Foam ring where the foundation meets the water, posts under docks
         if (!units.ponds.has(target)) {
           noOutline = true;
-          quad(p3(at(0, 0.005), 0.02), p3(at(1, 0.005), 0.02), p3(at(1, 0.14), 0.02), p3(at(0, 0.14), 0.02), [0, 1, 0], FOAM, m);
+          // Stops where a rounded corner takes over (fa/fb lie on a-b)
+          const tOf = (pt) => ((pt[0] - a[0]) * (b[0] - a[0]) + (pt[1] - a[1]) * (b[1] - a[1])) / (len * len);
+          const t0 = tOf(fa), t1 = tOf(fb);
+          quad(p3(at(t0, 0.005), 0.02), p3(at(t1, 0.005), 0.02), p3(at(t1, 0.14), 0.02), p3(at(t0, 0.14), 0.02), [0, 1, 0], FOAM, m);
           noOutline = false;
         }
         if (style === 'dock') box(at(0.5, 0.06), -0.3, y1 + 0.12, 0.05, dirAlong(), WOOD, m);
@@ -1459,6 +1462,35 @@ export class Town {
       const porthole = (r, hc) => {
         fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, WHITE);
         fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, WINDOW);
+      };
+      // Flower box hanging under a window's sill: this half fills u = 0..uw
+      const flowerBox = (uw, yS, seed) => {
+        slab(0, uw, 0.1, yS - 0.08, yS + 0.005, seed < 0.5 ? TERRACOTTA : WHITE);
+        const leaf = pickFrom(LEAVES, seed * 7 % 1);
+        for (const [x, r] of [[0.05, 0.045], [0.15, 0.04]]) {
+          if (U(x) > uw) continue;
+          const pos = at(tm(U(x)), 0.06);
+          blob([pos[0], yS + 0.025, pos[1]], r, 0.8, leaf, m);
+          const bloom = at(tm(U(x + 0.03)), 0.085);
+          blob([bloom[0], yS + 0.05, bloom[1]], 0.025, 1, pickFrom(BLOOMS, (seed * 13 + x * 3) % 1), m);
+        }
+      };
+      // Striped awning over a door, sloping out from the wall; stripes are laid out in world
+      // units from the face center so the two halves line up. This half covers u = 0..uw.
+      const awning = (uw, yW, yO, d, color) => {
+        const sw = 0.06, n = Math.ceil((uw * len) / sw), yV = yO - 0.05;
+        for (let k = 0; k < n; k++) {
+          const u0 = (k * sw) / len, u1 = Math.min(uw, ((k + 1) * sw) / len);
+          const c = k % 2 ? WHITE : color;
+          const w0 = at(tm(u0), 0), w1 = at(tm(u1), 0), o0 = at(tm(u0), d), o1 = at(tm(u1), d);
+          quad(p3(w0, yW), p3(w1, yW), p3(o1, yO), p3(o0, yO), [towards[0], 1, towards[2]], c, m);
+          quad(p3(o0, yO), p3(o1, yO), p3(o1, yV), p3(o0, yV), towards, c, m);
+          noOutline = true;
+          quad(p3(w0, yW), p3(w1, yW), p3(o1, yV), p3(o0, yV), [0, -1, 0], c.clone().multiplyScalar(0.6), m);
+          noOutline = false;
+        }
+        const e = at(tm(uw), 0), eo = at(tm(uw), d), side = [e[0] - at(tm(0), 0)[0], 0, e[1] - at(tm(0), 0)[1]];
+        tri(p3(e, yW), p3(eo, yO), p3(eo, yV), side, color, m);
       };
       // Door leaf u0..u1 (u = 0 at the edge midpoint); starting at 0 it is one wing of a double
       // door centered on the face, whose other wing comes from the neighbouring half-wall
@@ -1528,11 +1560,14 @@ export class Town {
       // Ground floor facing a plaza, or any floor a walkway docks onto, gets a double door
       if ((facesPlaza && h < 0.6) || (units.bridge.has(this.key(target, L)) && h < 0.75)) {
         door(0, 0.2, pickFrom(DOORS, hash(v, target, 3)));
+        if (facesPlaza && hash(v, target, 8) < 0.55) awning(0.29, y0 + 0.66, y0 + 0.54, 0.2, pickFrom(UMBRELLAS.slice(0, 3), hash(v, target, 9)));
         return;
       }
       if (h < 0.1) return; // blank wall
       if (h < 0.42) {
         window1(0.15, 0.21, 0.57);
+        const fb = hash(v, L, target, 17);
+        if (fb < 0.45) flowerBox(U(0.15) + U(FRAME) + U(0.02), y0 + 0.21 - FRAME, fb / 0.45);
       } else if (h < 0.62) {
         window1(0.14, 0.19, 0.59, true);
       } else if (h < 0.76) {
@@ -1575,11 +1610,15 @@ export class Town {
       // Outer corners of houses standing on the floor below are rounded: quadrant i's two walls
       // meet the quad center on an arc tangent to both. Returns its points from the wall towards
       // n to the wall towards p, with outward normals, or null when the corner stays sharp.
+      // Foundations round off too, unless a house above keeps the corner square.
       const cornerArc = (i, L) => {
-        if (L < 1 || !this.has(q[i], L) || !this.has(q[i], L - 1)) return null;
+        if (!this.has(q[i], L) || (L > 0 && !this.has(q[i], L - 1))) return null;
         if ([1, 2, 3].some((d) => this.has(q[(i + d) % 4], L))) return null;
         const I = infoOf(q[i], L).info;
-        if (I.br || styleOf(I) !== 'normal') return null;
+        if (L === 0) {
+          if (styleOf(I) !== 'ground' || [1, 2, 3].some((d) => units.ponds.has(q[(i + d) % 4]))) return null;
+          if (this.has(q[i], 1) && !cornerArc(i, 1)) return null;
+        } else if (I.br || styleOf(I) !== 'normal') return null;
         const p = (i + 3) % 4;
         const l1 = Math.hypot(M[i][0] - Q[0], M[i][1] - Q[1]), l2 = Math.hypot(M[p][0] - Q[0], M[p][1] - Q[1]);
         const e1 = [(M[i][0] - Q[0]) / l1, (M[i][1] - Q[1]) / l1], e2 = [(M[p][0] - Q[0]) / l2, (M[p][1] - Q[1]) / l2];
@@ -1813,6 +1852,12 @@ export class Town {
               const m = { kind: 'wall', v, L, target: q[k < half - 0.5 ? n : p] };
               const h = [nrm[k][0] + nrm[k + 1][0], 0, nrm[k][1] + nrm[k + 1][1]];
               face(pts[k], pts[k + 1], yBottom(L), yt, h, wallColor, m, ...bands);
+              if (L === 0) {
+                const f = (j, d) => p3([pts[j][0] + nrm[j][0] * d, pts[j][1] + nrm[j][1] * d], 0.02);
+                noOutline = true;
+                quad(f(k, 0.005), f(k + 1, 0.005), f(k + 1, 0.14), f(k, 0.14), [0, 1, 0], FOAM, m);
+                noOutline = false;
+              }
             }
           }
           // Where only one of two stacked floors has its corner rounded, a ledge closes the step
