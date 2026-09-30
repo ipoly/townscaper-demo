@@ -1874,14 +1874,17 @@ export class Town {
             if (eaved[i] && !allHigh) {
               const cap = color.clone().multiplyScalar(1.06);
               if (ridge[n] && eaved[n] && inf[n].r === rise) ridgeCap([p3(C[i], hC), p3(M[i], hC)], RIDGE_R, cap, topMeta, false);
-              if (!(high[n] && high[p])) {
+              // Only a true hip (both edges low) folds along C -> Q; beside a ridge or a taller
+              // wall that line lies flat on the roof slope
+              if (!high[n] && !high[p]) {
                 const pts = [p3(C[i], hC)];
                 if (arc) {
                   const k = arc.pts.length >> 1, e = arc.pts[k], en = arc.nrm[k];
                   pts.push(p3(e, yt), p3([e[0] + en[0] * EAVE, e[1] + en[1] * EAVE], yt - EAVE_DROP));
                 } else {
                   pts.push(p3(Q, yt));
-                  const wm = !occ[p] ? M[p] : !occ[n] ? M[i] : null;
+                  // No eave tip past a corner the diagonal quadrant also reaches
+                  const wm = occ[(i + 2) % 4] ? null : !occ[p] ? M[p] : !occ[n] ? M[i] : null;
                   if (wm) {
                     const dl = Math.hypot(Q[0] - C[i][0], Q[1] - C[i][1]) || 1, d = [(Q[0] - C[i][0]) / dl, (Q[1] - C[i][1]) / dl];
                     const wl = Math.hypot(wm[0] - Q[0], wm[1] - Q[1]) || 1, wn = [(wm[1] - Q[1]) / wl, -(wm[0] - Q[0]) / wl];
@@ -2070,27 +2073,6 @@ export class Town {
               quad(p3(ai, yb), p3(aj, yb), p3(aj, ys), p3(ai, ys), out, WHITE, m);
               fence(lerp2(ai, Q, 0.06), lerp2(aj, Q, 0.06), ys, WHITE, m, 0.18);
               if (hash(quadId, L, 96 + k) < 0.6) plants(lerp2(Q, lerp2(ai, aj, 0.5), 0.55), ys, hash(quadId, L, 97), m);
-            } else if (s < 0.72 && !top[i] && !top[j]) {
-              // Arch spanning the nook between the two walls
-              const color = wallColorOf(inf[vi], L);
-              const A = lerp2(Q, ai, 0.94), B = lerp2(Q, aj, 0.94);
-              const d = [B[0] - A[0], B[1] - A[1]];
-              const dl = Math.hypot(d[0], d[1]) || 1;
-              let nrm = [-d[1] / dl, d[0] / dl];
-              const mid = lerp2(A, B, 0.5);
-              if (nrm[0] * (mid[0] - Q[0]) + nrm[1] * (mid[1] - Q[1]) < 0) nrm = [-nrm[0], -nrm[1]];
-              const back = (pt) => [pt[0] - nrm[0] * 0.1, pt[1] - nrm[1] * 0.1];
-              const under = (t) => yt - 0.46 + 0.32 * Math.sin(Math.PI * t);
-              const P = (t) => lerp2(A, B, t);
-              const out = [nrm[0], 0, nrm[1]], inw = [-nrm[0], 0, -nrm[1]];
-              quad(p3(A, yt), p3(B, yt), p3(back(B), yt), p3(back(A), yt), [0, 1, 0], color, m);
-              for (let s2 = 0; s2 < 8; s2++) {
-                const t0 = s2 / 8, t1 = (s2 + 1) / 8;
-                const a = P(t0), b = P(t1);
-                quad(p3(a, under(t0)), p3(b, under(t1)), p3(b, yt), p3(a, yt), out, color, m);
-                quad(p3(back(a), under(t0)), p3(back(b), under(t1)), p3(back(b), yt), p3(back(a), yt), inw, color, m);
-                quad(p3(a, under(t0)), p3(b, under(t1)), p3(back(b), under(t1)), p3(back(a), under(t0)), [0, -1, 0], color.clone().multiplyScalar(0.75), m);
-              }
             }
           });
         }

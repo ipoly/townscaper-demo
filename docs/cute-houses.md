@@ -119,3 +119,9 @@ the original Townscaper.
  - Ivy: ~22% of the outer ground-floor walls get a patch of `IVY` leaf blobs near one corner, wide at
    the foot and narrowing upwards, reaching into the next floor when there is one.
 - 2026-09-30: window glints removed; the slanted strips read as clutter rather than reflections.
+- 2026-09-30: nook arches and stray hip caps fixed.
+ - Diagonal nooks no longer get an arch; it cut through the windows and doors centered on the walls.
+ - Hip caps are only drawn where both edges of the quadrant are low. Beside a same-height ridge or a
+   taller wall the C -> Q line lies flat on the slope, so the caps there stuck out past the eave
+   (crossing in an X between two roofs, or poking out beside a taller neighbour). The eave tip is
+   also skipped when the diagonal quadrant is built.
