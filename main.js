@@ -256,7 +256,8 @@ function setMood(i, ease = 1.6) {
 const themeColorEl = document.querySelector('meta[name="theme-color"]');
 const faviconEl = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
 const faviconPngEl = document.querySelector('link[rel="icon"][type="image/png"]');
-const faviconSvg = fetch(faviconEl.href).then((r) => r.text()).catch(() => null);
+// A missing icon (or link) only leaves the tab icon as it is, it never stops the app
+const faviconSvg = faviconEl ? fetch(faviconEl.href).then((r) => (r.ok ? r.text() : null)).catch(() => null) : Promise.resolve(null);
 const FAVICON_DAY = ['#e8f5f6', '#bfe3ea', '#5aa6c4', '#34424f', '#fcc28d', '#af3d36'];
 const FAVICON = {
   Dusk: ['#ffd0a8', '#f0b48e', '#6b8fb2', '#ffc861', '#f0a878', '#9c3432'],
@@ -269,6 +270,7 @@ async function syncFavicon(name) {
   const colors = FAVICON[name] ?? FAVICON_DAY;
   const url = 'data:image/svg+xml,' + encodeURIComponent(FAVICON_DAY.reduce((out, c, i) => out.replaceAll(c, colors[i]), svg));
   faviconEl.href = url;
+  if (!faviconPngEl) return;
   // Browsers that pick the PNG fallback get the same picture, drawn from the SVG
   const img = new Image();
   img.src = url;
