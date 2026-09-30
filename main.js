@@ -109,10 +109,27 @@ totalEmissiveRadiance += vGlow * uNight * vec3(1.0, 0.68, 0.3) * 1.8;`);
   return material;
 }
 
-const townMaterial = withPop(new THREE.MeshStandardMaterial({
+// Colored shade: part of the sky and ground light is tinted with a deeper version of the surface
+// color, so shaded walls stay saturated instead of turning grey (the way painted plaster reads)
+const SHADE_TINT = 0.6;
+function withColoredShade(material) {
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, r) => {
+    prev?.call(material, shader, r);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+{
+  vec3 base = diffuseColor.rgb;
+  vec3 tint = min(base * base / max(dot(base, vec3(0.3333)), 1e-3), vec3(1.5));
+  reflectedLight.indirectDiffuse = mix(reflectedLight.indirectDiffuse, irradiance * RECIPROCAL_PI * tint, ${SHADE_TINT.toFixed(2)});
+}`);
+  };
+  return material;
+}
+
+const townMaterial = withColoredShade(withPop(new THREE.MeshStandardMaterial({
   vertexColors: true, flatShading: true, roughness: 0.85,
   polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-}), { glow: true });
+}), { glow: true }));
 const townDepthMaterial = withPop(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
 const outlineMaterial = withPop(new THREE.LineBasicMaterial({ color: '#6b5446', transparent: true, opacity: 0.3 }));
 const ghostMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45, depthWrite: false });
@@ -924,7 +941,7 @@ function litColors(colors, up) {
   cam.lookAt(0, 0, 0);
   const geo = new THREE.PlaneGeometry(4, 4), attr = new THREE.Float32BufferAttribute(new Float32Array(12), 3);
   geo.setAttribute('color', attr);
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
+  const mat = withColoredShade(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }));
   const mesh = new THREE.Mesh(geo, mat);
   s.add(mesh);
   const gl = renderer.getContext(), px = new Uint8Array(4), size = renderer.getDrawingBufferSize(new THREE.Vector2());

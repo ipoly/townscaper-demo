@@ -186,3 +186,9 @@ the original Townscaper.
  - The hemisphere ground light is a warm grey (`#a89c8a`) instead of blue-grey, so shaded walls stay warm.
  - Soft bloom was tried and dropped: it mostly showed on lit windows at night and cost several extra
    full-screen passes per frame on phones.
+- 2026-09-30: colored shade.
+ - `withColoredShade()` in `main.js` tints 60% of the sky and ground light with a deeper version of the
+   surface color, so shaded walls stay saturated instead of turning grey, like painted plaster. The
+   swatch material uses it too, so swatches still match.
+ - A fuller fake subsurface scattering (wrap lighting, light through edges, colored rim, roughness 0.5)
+   was tried first and dropped: it read as plastic. The surfaces stay matte (roughness 0.85).
