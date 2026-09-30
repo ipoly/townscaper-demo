@@ -219,3 +219,7 @@ the original Townscaper.
    four in five are on, at dawn only the early risers.
  - Chimneys smoke at dusk, and at dawn in half of the early-riser houses (breakfast).
  - All of it lives in the existing town and water shaders, no extra draw calls.
+- 2026-09-30: a splash screen while Three.js loads and the town is built.
+ - Plain HTML and CSS in index.html, so it shows at once: the app icon floating, the title and three
+   hopping dots in palette colors.
+ - It fades out once the first frame has been rendered (shaders compiled), then removes itself.

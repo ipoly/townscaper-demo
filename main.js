@@ -1425,6 +1425,7 @@ for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
   addEventListener(type, markActive, { capture: true, passive: true });
 }
 controls.addEventListener('change', markActive);
+let splash = document.getElementById('splash');
 renderer.setAnimationLoop(() => {
   const t = now();
   // Small slack so a 60Hz display lands on every second frame instead of drifting
@@ -1462,6 +1463,13 @@ renderer.setAnimationLoop(() => {
     l.g.scale.setScalar(Math.min(1, Math.max(0.001, (t - l.born - 0.4) / 0.6)));
   }
   renderer.render(scene, camera);
+  // The first frame is on screen (shaders compiled): let the town pop in from behind the splash
+  if (splash) {
+    const el = splash;
+    splash = null;
+    el.classList.add('done');
+    el.addEventListener('transitionend', () => el.remove(), { once: true });
+  }
 });
 
 if ('serviceWorker' in navigator) {
