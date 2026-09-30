@@ -1,7 +1,7 @@
 // Low-level drawing into a quad's record: triangles and simple solids with per-vertex color,
 // pivot, birth time, glow and sway, plus the outline flag. Knows nothing about what it draws.
 
-import { WINDOW, CURTAINS, LAMP, LAMP_ORDER, ICO } from './constants.js';
+import { WINDOW, PAPER, CURTAINS, LAMP, LANTERN, LAMP_ORDER, ICO } from './constants.js';
 
 export const p3 = (p, y) => [p[0], y, p[1]];
 export const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -40,7 +40,7 @@ export class Emitter {
     const n = [nx / len, ny / len, nz / len];
     const pv = this.pivotOf(m);
     const cell = this.cellOf(m);
-    const glow = color === LAMP ? LAMP_ORDER : color === WINDOW || CURTAINS.includes(color) ? cell.lit : 0;
+    const glow = color === LAMP || color === LANTERN ? LAMP_ORDER : color === WINDOW || color === PAPER || CURTAINS.includes(color) ? cell.lit : 0;
     for (const p of [a, b, c]) {
       this.R.position.push(p[0], p[1], p[2]);
       this.R.normal.push(n[0], n[1], n[2]);

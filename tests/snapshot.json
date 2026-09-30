@@ -46,5 +46,17 @@
  "fuzz13-edited": {
   "hash": "9437a2551bb92c48",
   "tris": 61335
+ },
+ "chinese:showcase": {
+  "hash": "cf834a5c1f28c152",
+  "tris": 57876
+ },
+ "chinese:seed7": {
+  "hash": "cd1a5aec6bc96446",
+  "tris": 21649
+ },
+ "chinese:fuzz11": {
+  "hash": "768c1562370a1c10",
+  "tris": 69979
  }
 }

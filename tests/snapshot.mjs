@@ -102,6 +102,16 @@ for (const seed of [11, 12, 13]) {
   results[`fuzz${seed}-edited`] = fingerprint(town.buildChunks());
 }
 
+// Every other style on a few of the towns
+for (const style of Object.keys(STYLES).filter((n) => n !== DEFAULT_STYLE)) {
+  for (const [name, { grid, cells }] of [['showcase', decode(fixtures.showcase)], ['seed7', decode(fixtures.seed7)], ['fuzz11', fuzz(11)]]) {
+    const town = new Town(grid);
+    town.setStyle(style);
+    for (const c of cells) place(town, grid, c);
+    results[`${style}:${name}`] = fingerprint(town.buildChunks());
+  }
+}
+
 // Switching style rebuilds every chunk, and switching back gives the original geometry exactly
 {
   const base = STYLES[DEFAULT_STYLE];
@@ -132,7 +142,7 @@ if (process.argv.includes('--update') || !existsSync(file)) {
     const a = expected[name], b = results[name];
     const ok = a && b && a.hash === b.hash;
     if (!ok) failed++;
-    console.log(`${ok ? 'ok  ' : 'FAIL'} ${name.padEnd(16)} ${b ? `${b.tris} tris` : 'missing'}${ok || !a ? '' : ` (was ${a.tris})`}`);
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${name.padEnd(20)} ${b ? `${b.tris} tris` : 'missing'}${ok || !a ? '' : ` (was ${a.tris})`}`);
   }
   if (failed) { console.log(`${failed} town(s) changed`); process.exit(1); }
   console.log('All towns unchanged');

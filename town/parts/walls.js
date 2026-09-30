@@ -1,12 +1,13 @@
 // Wall surfaces and everything on them: the face with its soft occlusion bands, windows, doors,
 // shutters, balconies, railings and the foundation's waterline.
 
-import { AO_BAND, AO_FOOT, AO_EAVES, DECK, STONE, WINDOW, CURTAINS, IVY, WHITE, FOAM, GOLD, SLATE, LAMP, WOOD, SHADOW, TERRACOTTA, UMBRELLAS, BLOOMS, LEAVES, SHUTTERS, DOORS, yBottom, yTop, hash, pickFrom } from '../constants.js';
+import { AO_BAND, AO_FOOT, AO_EAVES, DECK, STONE, WINDOW, CURTAINS, IVY, WHITE, FOAM, GOLD, SLATE, LAMP, WOOD, SHADOW, TERRACOTTA, BLOOMS, LEAVES, SHUTTERS, GRANITE, yBottom, yTop, hash, pickFrom } from '../constants.js';
 import { p3, lerp2 } from '../emitter.js';
 
 // ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function wallParts(ctx) {
-  const { E, tri, quad, blob, box, prism, cone, bar, town, verts, units, infoOf, fence } = ctx;
+  const { E, tri, quad, blob, box, prism, cone, bar, town, kit, verts, units, infoOf, fence, redLantern, stoneSpan } = ctx;
+  const TRIM = kit.trim, GLASS = kit.glass;
 
   // Wall face a->b between heights y0 and y1, darkened in soft bands where it stands on the
   // ground (foot) or tucks under the eaves, in place of ambient occlusion
@@ -81,6 +82,25 @@ export function wallParts(ctx) {
       if (style === 'dock') box(at(0.5, 0.06), -0.3, y1 + 0.12, 0.05, dirAlong(), WOOD, m);
       return;
     }
+    if (bridge && stoneSpan(infoOf(v, L).info, L)) {
+      // Granite arch bridge: the side reaches down into the water, each wall face spans one
+      // arch centered on it, and a parapet with posts runs along the top
+      const yw = -0.03, rx = 0.82, ry = 0.19, dark = GRANITE.clone().multiplyScalar(0.8);
+      quad(p3(a, yw), p3(b, yw), p3(b, y0), p3(a, y0), towards, GRANITE, m);
+      const arch = (grow, off, c) => {
+        const pt = (ang) => p3(at(tm(Math.cos(ang) * (rx + grow)), off), yw + Math.sin(ang) * (ry + grow));
+        const c0 = p3(at(tm(0), off), yw);
+        for (let k = 0; k < 6; k++) tri(c0, pt((k * Math.PI) / 12), pt(((k + 1) * Math.PI) / 12), towards, c, m);
+      };
+      arch(0.035, 0.006, dark);
+      arch(0, 0.01, SHADOW);
+      const pa = (t, off, y) => p3(at(t, off), y), yp = y1 + 0.12;
+      quad(pa(0, 0, y1), pa(1, 0, y1), pa(1, 0, yp), pa(0, 0, yp), towards, GRANITE, m);
+      quad(pa(0, -0.06, y1), pa(1, -0.06, y1), pa(1, -0.06, yp), pa(0, -0.06, yp), [-towards[0], 0, -towards[2]], GRANITE, m);
+      quad(pa(0, 0, yp), pa(1, 0, yp), pa(1, -0.06, yp), pa(0, -0.06, yp), [0, 1, 0], GRANITE, m);
+      box(at(tm(0), -0.03), y1, yp + 0.07, 0.04, dirAlong(), GRANITE, m);
+      return;
+    }
     if (bridge) {
       // Railing along the open side of a walkway
       for (const t of [0.15, 0.85]) box(at(t, -0.04), y1, y1 + 0.22, 0.025, dirAlong(), WHITE, m);
@@ -127,31 +147,50 @@ export function wallParts(ctx) {
       const c = at(tm(0), 0);
       E.R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, rb, rt, order: I.lit, born: I.b });
     };
+    // Wooden lattice over this half of a pane: a bar down the middle (half of it here), one
+    // halfway out, and rails about every 0.09
+    const lattice = (hw, h0, h1) => {
+      const bw = 0.008;
+      rect(tm(0), tm(U(bw)), h0, h1, TRIM, 0.009);
+      rect(tm(U(hw / 2 - bw)), tm(U(hw / 2 + bw)), h0, h1, TRIM, 0.009);
+      const n = Math.max(2, Math.round((h1 - h0) / 0.09));
+      for (let k = 1; k < n; k++) {
+        const y = h0 + ((h1 - h0) * k) / n;
+        rect(tm(0), tm(U(hw)), y - bw, y + bw, TRIM, 0.009);
+      }
+    };
     // Big window with a chunky frame, optionally round-arched; hw is its half width
     const window1 = (hw, h0, h1, round = false, drape = null) => {
+      if (kit.lattice) { round = false; drape = null; }
       const w = U(hw), f = U(FRAME), yA = y0 + h0, yB = y0 + h1;
       halo((yA + yB) / 2, hw, (yB - yA) / 2, 0, round ? hw : 0);
       const ys = round ? yB - hw : yB; // springline of the arch
       skyGlass(yA, yB);
-      rect(tm(0), tm(w), h0, ys - y0, WINDOW, 0.004);
-      if (round) fan(ys, hw, 0, Math.PI / 2, 0.012, WINDOW);
+      rect(tm(0), tm(w), h0, ys - y0, GLASS, 0.004);
+      if (round) fan(ys, hw, 0, Math.PI / 2, 0.012, GLASS);
       E.shadeFn = null;
       if (drape) curtain(hw, yA, ys, drape);
-      slab(w, w + f, 0.035, yA, ys, WHITE);
-      slab(0, w + f + U(0.02), 0.06, yA - FRAME, yA, WHITE); // sill
+      if (kit.lattice) lattice(hw, h0, h1);
+      slab(w, w + f, 0.035, yA, ys, TRIM);
+      slab(0, w + f + U(0.02), 0.06, yA - FRAME, yA, TRIM); // sill
       if (!round) {
-        slab(0, w + f, 0.04, yB, yB + FRAME, WHITE);
+        slab(0, w + f, 0.04, yB, yB + FRAME, TRIM);
         return;
       }
-      fan(ys, hw + FRAME, 0, Math.PI / 2, 0.008, WHITE);
+      fan(ys, hw + FRAME, 0, Math.PI / 2, 0.008, TRIM);
     };
     // Round window: this half draws its half disc
     const porthole = (r, hc) => {
       halo(y0 + hc, r, r, r, r);
-      fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, WHITE);
+      fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, TRIM);
       skyGlass(y0 + hc - r, y0 + hc + r);
-      fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, WINDOW);
+      fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, GLASS);
       E.shadeFn = null;
+      if (!kit.lattice) return;
+      // Moon window: a cross of bars and two rails, each cut to the circle
+      const bw = 0.008;
+      rect(tm(0), tm(U(bw)), hc - r, hc + r, TRIM, 0.015);
+      for (const dy of [-r / 2, 0, r / 2]) rect(tm(0), tm(U(Math.sqrt(r * r - dy * dy))), hc + dy - bw, hc + dy + bw, TRIM, 0.015);
     };
     // Flower box hanging under a window's sill: this half fills u = 0..uw
     const flowerBox = (uw, yS, seed) => {
@@ -171,7 +210,7 @@ export function wallParts(ctx) {
       const sw = 0.06, n = Math.ceil((uw * len) / sw), yV = yO - 0.05;
       for (let k = 0; k < n; k++) {
         const u0 = (k * sw) / len, u1 = Math.min(uw, ((k + 1) * sw) / len);
-        const c = k % 2 ? WHITE : color;
+        const c = k % 2 && kit.stripes ? WHITE : color;
         const w0 = at(tm(u0), 0), w1 = at(tm(u1), 0), o0 = at(tm(u0), d), o1 = at(tm(u1), d);
         quad(p3(w0, yW), p3(w1, yW), p3(o1, yO), p3(o0, yO), [towards[0], 1, towards[2]], c, m);
         quad(p3(o0, yO), p3(o1, yO), p3(o1, yV), p3(o0, yV), towards, c, m);
@@ -187,6 +226,23 @@ export function wallParts(ctx) {
     // An arched double door gets a half-round fanlight spanning both wings instead.
     const door = (u0, u1, color, arched = false) => {
       const hd = 0.42, f = 0.05;
+      if (kit.studded) {
+        // Lacquered leaves with rows of gold studs and a ring knocker, framed in wood under a lintel
+        rect(tm(u0), tm(u1), 0.03, hd + 0.06, color, 0.006);
+        for (let r = 0; r < 4; r++) {
+          for (let c = 0; c < 2; c++) {
+            const uc = u0 + ((u1 - u0) * (c + 0.5)) / 2, yc = 0.14 + r * 0.075;
+            rect(tm(uc - U(0.009)), tm(uc + U(0.009)), yc - 0.009, yc + 0.009, GOLD, 0.01);
+          }
+        }
+        const knob = u0 > 0 ? u0 + U(0.035) : U(0.035);
+        rect(tm(knob - U(0.014)), tm(knob + U(0.014)), hd * 0.5 - 0.014, hd * 0.5 + 0.014, GOLD, 0.01);
+        if (u0 > 0) slab(u0 - f, u0, 0.03, y0, y0 + hd + 0.06, TRIM);
+        slab(u1, u1 + f, 0.03, y0, y0 + hd + 0.06, TRIM);
+        slab(Math.max(0, u0 - f - 0.03), u1 + f + 0.03, 0.05, y0 + hd + 0.06, y0 + hd + 0.11, TRIM);
+        slab(Math.max(0, u0 - f - 0.03), u1 + f + 0.03, 0.08, y0, y0 + 0.03, STONE); // doorstep
+        return;
+      }
       if (arched && u0 === 0) {
         const r = u1 * len, fw = f * len;
         rect(tm(0), tm(u1), 0.03, hd, color, 0.006);
@@ -261,13 +317,19 @@ export function wallParts(ctx) {
     }
     if (L === 2 && town.hasStair(v, target) && !aIsM) {
       // Door on the landing at the top of the staircase
-      door(0.6, 0.9, pickFrom(DOORS, hash(v, target, 3)));
+      door(0.6, 0.9, pickFrom(kit.doors, hash(v, target, 3)));
       return;
     }
     // Ground floor facing a plaza, or any floor a walkway docks onto, gets a double door
     // Wall lantern on a bracket beside a door; this half draws the one on its side
     const lantern = (u, yl) => {
       const w0 = at(tm(u), 0), w1 = at(tm(u), 0.07);
+      if (kit.lanterns === 'red') {
+        slab(u - U(0.012), u + U(0.012), 0.09, yl + 0.16, yl + 0.18, TRIM);
+        const w2 = at(tm(u), 0.08);
+        redLantern(p3(w2, yl + 0.16), 0.045, m);
+        return;
+      }
       slab(u - U(0.012), u + U(0.012), 0.07, yl + 0.1, yl + 0.12, SLATE);
       box(w1, yl, yl + 0.09, 0.03, dirAlong(), LAMP, m);
       cone(w1, 0.05, yl + 0.09, yl + 0.14, 4, SLATE, m, Math.PI / 4);
@@ -276,8 +338,8 @@ export function wallParts(ctx) {
     if ((facesPlaza && h < 0.6) || (units.bridge.has(town.key(target, L)) && h < 0.75)) {
       if (hash(v, target, 11) < 0.5) lantern(Math.min(0.9, 0.2 + 0.05 + U(0.08)), y0 + 0.36);
       const shaded = facesPlaza && hash(v, target, 8) < 0.55;
-      door(0, 0.2, pickFrom(DOORS, hash(v, target, 3)), !shaded && hash(v, target, 10) < 0.6);
-      if (shaded) awning(0.29, y0 + 0.66, y0 + 0.54, 0.2, pickFrom(UMBRELLAS.slice(0, 3), hash(v, target, 9)));
+      door(0, 0.2, pickFrom(kit.doors, hash(v, target, 3)), !shaded && hash(v, target, 10) < 0.6);
+      if (shaded) awning(0.29, y0 + 0.66, y0 + 0.54, 0.2, pickFrom(kit.awnings, hash(v, target, 9)));
       // Potted shrub on the ground beside some plaza doors, past the doorstep
       if (facesPlaza && L === 1 && hash(v, target, 25) < 0.45) {
         const pos = at(tm(Math.min(0.9, 0.28 + U(0.07))), 0.1), fl = hash(v, target, 26) < 0.5;
@@ -340,7 +402,7 @@ export function wallParts(ctx) {
     } else if (h < 0.76) {
       const sc = pickFrom(SHUTTERS, hash(v, L, 11)), w = U(0.13) + U(0.045);
       window1(0.13, 0.23, 0.55);
-      slab(w + U(0.015), w + U(0.12), 0.02, y0 + 0.22, y0 + 0.56, sc);
+      if (!kit.lattice) slab(w + U(0.015), w + U(0.12), 0.02, y0 + 0.22, y0 + 0.56, sc);
     } else if (h < 0.86 && L >= 2) {
       // Balcony: French window, thick slab on brackets, balustrade, sometimes a pot
       const iron = hash(v, L, target, 13) < 0.45;

@@ -1,9 +1,10 @@
 // All building styles by name; the first is the default.
 
 import european from './european.js';
+import chinese from './chinese.js';
 import { PALETTE_SIZE } from '../constants.js';
 
-export const STYLES = { european };
+export const STYLES = { european, chinese };
 export const DEFAULT_STYLE = 'european';
 
 for (const kit of Object.values(STYLES)) {

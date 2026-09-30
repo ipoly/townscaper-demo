@@ -1,12 +1,12 @@
 // Small things around the houses: fountains, trees, fences, potted plants, strings of bunting
 // and washing across streets, street lamps and benches, terrace parasols, ducks and lily pads.
 
-import { WHITE, TRUNK, WATER, GOLD, SLATE, LAMP, WOOD, LILY, BLOSSOM, TERRACOTTA, UMBRELLAS, LEAVES, yBottom, hash, pickFrom, SHUTTERS } from '../constants.js';
+import { WHITE, TRUNK, WATER, GOLD, SLATE, LAMP, LANTERN, LACQUER, WOOD, LILY, BLOSSOM, TERRACOTTA, UMBRELLAS, LEAVES, yBottom, hash, pickFrom, SHUTTERS } from '../constants.js';
 import { p3, lerp2, offset } from '../emitter.js';
 
 // ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function propParts(ctx) {
-  const { quad, blob, box, prism, cone, bar, sagString, hanging, town, verts, kit } = ctx;
+  const { E, quad, blob, box, prism, cone, bar, sagString, hanging, town, verts, kit } = ctx;
   const WALLS = kit.walls;
 
   const fountain = (c2, y, scale, m) => {
@@ -37,13 +37,30 @@ export function propParts(ctx) {
       blob([pos[0], y + 0.15, pos[1]], 0.08, 1.1, pickFrom(LEAVES, hash(seed * 997, k)), m);
     }
   };
+  // Red paper lantern hanging from the point top: lacquered caps, a round body of radius r, a
+  // tassel below. Lit like a lamp at dusk, with a round halo
+  const redLantern = (top, r, m) => {
+    const [x, y, z] = top, c2 = [x, z], yc = y - 0.02 - r;
+    bar(top, [x, y - 0.03, z], 0.006, LACQUER, m);
+    prism(c2, r * 0.5, y - 0.035, y - 0.015, 6, LACQUER, m);
+    blob([x, yc, z], r, 1.1, LANTERN, m);
+    prism(c2, r * 0.45, yc - r * 1.1, yc - r * 0.95, 6, LACQUER, m);
+    box(c2, yc - r * 1.1 - 0.05, yc - r * 1.1, 0.008, [1, 0], LANTERN, m);
+    E.R.fx.glows.push({ x, y: yc, z, born: E.cellOf(m).b });
+  };
+  // n lanterns spread along a sagging string at(t), t0..t1
+  const lanternString = (at, n, t0, t1, r, m) => {
+    for (let f = 0; f < n; f++) redLantern(at(t0 + ((t1 - t0) * (f + 0.5)) / n), r, m);
+  };
   // Bunting or a washing line across the street over ground cell v, between the second-floor
   // walls of the two facing houses (walls pass through the edge midpoints)
   const streetString = (v, [a, b], m) => {
     const y = yBottom(2) + 0.67;
     const pa = p3(lerp2(verts[v], verts[a], 0.5), y), pb = p3(lerp2(verts[v], verts[b], 0.5), y);
     const len = Math.hypot(pb[0] - pa[0], pb[2] - pa[2]);
-    if (hash(v, 131) < 0.55) {
+    if (hash(v, 131) < 0.55 && kit.lanterns === 'red') {
+      lanternString(sagString(pa, pb, 0.09, LACQUER, m), Math.max(2, Math.round(len / 0.3)), 0.08, 0.92, 0.045, m);
+    } else if (hash(v, 131) < 0.55) {
       const at = sagString(pa, pb, 0.09, WHITE, m);
       const n = Math.max(3, Math.round(len / 0.17)), step = 0.84 / n;
       for (let f = 0; f < n; f++) {
@@ -109,5 +126,5 @@ export function propParts(ctx) {
     if (flower) blob([c2[0], y + 0.03, c2[1]], 0.03, 0.8, BLOSSOM, m);
   };
 
-  return { fountain, tree, fence, plants, streetString, plazaProp, terraceProps, duck, lilyPad };
+  return { fountain, tree, fence, plants, redLantern, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad };
 }

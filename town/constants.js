@@ -57,6 +57,12 @@ export const BLOOMS = ['#e2574c', '#f2a7c3', '#f2c14e', '#7fb865'].map((c) => ne
 export const LEAVES = ['#6fa35a', '#7fb865', '#5d9150', '#9bc46e'].map((c) => new THREE.Color(c));
 export const SHUTTERS = ['#4f7f6a', '#4a6a8f', '#a8553f', '#e8e2d6'].map((c) => new THREE.Color(c));
 export const DOORS = ['#6b4632', '#3f5e7a', '#7a3b3b', '#48664a'].map((c) => new THREE.Color(c));
+// Chinese pieces: lacquered wood trim, paper windows that glow like glass, red lanterns lit like
+// lamps, and the granite of arch bridges
+export const LACQUER = new THREE.Color('#6e3226');
+export const PAPER = new THREE.Color('#efdcb4');
+export const LANTERN = new THREE.Color('#d9412e');
+export const GRANITE = new THREE.Color('#c4bdb0');
 
 export const ICO = new THREE.IcosahedronGeometry(1, 0).toNonIndexed().attributes.position.array;
 

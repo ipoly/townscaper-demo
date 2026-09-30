@@ -310,3 +310,19 @@ step keeps the geometry byte for byte the same.
   through the usual caches. The snapshot test also switches seed1 to a scratch kit and back, which
   must rebuild every chunk and return the exact original geometry. The swatches in main.js read
   the default kit for now. Snapshot identical.
+
+## Chinese style
+
+- 2026-09-30: stage 1. A second kit, town/styles/chinese.js: whitewashed and earth-toned walls under
+  grey tiles, with vermilion walls and yellow, green and blue glazed roofs in the bolder slots
+  (each hue family stays in its european slot). The render boosts saturation a lot, so the hexes
+  are much greyer than they look. Kits now also declare the pieces they draw their own way, and
+  the european values keep the old look byte for byte: lacquered trim and paper panes with a
+  wooden lattice (no arches, shutters or curtains; round windows become moon windows with cut
+  bars), red doors with gold studs and ring knockers under a lintel, plain awnings, red paper
+  lanterns by doors and strung across streets and nooks instead of bunting, and walkways just over
+  the water (level 1, wooden style) built as granite bridges with an arch per wall face reaching
+  into the water and a parapet with posts, standing without posts or brackets. Paper and lanterns
+  glow at night like glass and lamps. The style is town-wide: a toolbar button and B cycle it, new
+  islands keep it, and links carry `&style=chinese` (left out for the default, so old links stay
+  the same). The snapshot test also builds three towns in every other style.

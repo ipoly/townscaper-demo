@@ -8,7 +8,7 @@
 // an edit only re-emits the quads whose inputs actually changed.
 
 import * as THREE from 'three';
-import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, SPIRE_RISE, ARCH_RISE, DECK, POND_Y, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, GOLD, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, yBottom, yTop, hash, pickFrom, PALETTE_SIZE } from './town/constants.js';
+import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, SPIRE_RISE, ARCH_RISE, DECK, POND_Y, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, GOLD, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, LACQUER, GRANITE, yBottom, yTop, hash, pickFrom, PALETTE_SIZE } from './town/constants.js';
 import { STYLES, DEFAULT_STYLE } from './town/styles/index.js';
 import { Emitter, p3, lerp2, offset } from './town/emitter.js';
 import { propParts } from './town/parts/props.js';
@@ -756,9 +756,11 @@ export class Town {
     const E = new Emitter((m) => this.pivot(m.v, m.L), (m) => m.pond ?? infoOf(m.v, m.L).info);
     const { tri, quad, blob, box, prism, cone, ridgeCap, sagString, hanging } = E;
     // Building parts, each made from the tools, the town and the parts made before it
-    const ctx = { E, tri, quad, blob, box, prism, cone, bar: E.bar, ridgeCap, sagString, hanging, town: this, kit, verts, units, infoOf };
+    // Walkways just over the water become arch bridges where the style builds them in stone
+    const stoneSpan = (I, L) => kit.stoneBridges && L === 1 && I.br && I.bs === 'w';
+    const ctx = { E, tri, quad, blob, box, prism, cone, bar: E.bar, ridgeCap, sagString, hanging, town: this, kit, verts, units, infoOf, stoneSpan };
     for (const make of [propParts, landmarkParts, roofParts, carryParts, wallParts]) Object.assign(ctx, make(ctx));
-    const { fountain, tree, fence, plants, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
+    const { fountain, tree, fence, plants, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
 
     const emitQuad = (q) => {
       const C = q.map((v) => verts[v]);
@@ -890,7 +892,7 @@ export class Town {
 
           if (top[i] && br[i]) {
             const yd = yBottom(L);
-            quad(p3(C[i], yd), p3(M[i], yd), p3(Q, yd), p3(M[p], yd), [0, 1, 0], DECK_TOP, topMeta);
+            quad(p3(C[i], yd), p3(M[i], yd), p3(Q, yd), p3(M[p], yd), [0, 1, 0], stoneSpan(I, L) ? GRANITE : DECK_TOP, topMeta);
             if (roofed[i]) canopy(v, L, I, q, i, C, M, Q, occ, br, roofed, yd, firstQuad, topMeta);
           } else if (top[i] && I.tr) {
             fanOver(C[i], yt, rim(yt, yt, yt), [0, 1, 0], TERRACE, topMeta);
@@ -1020,9 +1022,11 @@ export class Town {
             if (br[i]) {
               const yb = yBottom(L) - DECK;
               quad(p3(C[i], yb), p3(M[i], yb), p3(Q, yb), p3(M[p], yb), [0, -1, 0], DECK_TOP.clone().multiplyScalar(0.7), bm);
-              if (I.pk) posts(v, L, I, q, i, C, M, Q, inf, yb, wallColor, firstQuad, bm);
-              if (I.bu) brackets(L, I, q, i, C, M, Q, yb, bm);
-              if (I.sy && firstQuad) tieRods(v, I, yBottom(L), bm);
+              // Stone spans stand on their own arches
+              const held = !stoneSpan(I, L);
+              if (held && I.pk) posts(v, L, I, q, i, C, M, Q, inf, yb, wallColor, firstQuad, bm);
+              if (held && I.bu) brackets(L, I, q, i, C, M, Q, yb, bm);
+              if (held && I.sy && firstQuad) tieRods(v, I, yBottom(L), bm);
               seams(v, L, I, q, i, C, M, Q, occ, inf, DECK_TOP.clone().multiplyScalar(0.7), bm);
             } else {
               const yb = yBottom(L);
@@ -1123,7 +1127,9 @@ export class Town {
             const yb = yBottom(L);
             const pi = (t, y) => p3(lerp2(Q, ai, t), y), pj = (t, y) => p3(lerp2(Q, aj, t), y);
             if (top[i] && top[j]) {
-              if (s < 0.55) {
+              if (s < 0.55 && kit.lanterns === 'red') {
+                lanternString(sagString(pi(0.75, yt - 0.03), pj(0.75, yt - 0.03), 0.07, LACQUER, m), 3, 0.1, 0.9, 0.04, m);
+              } else if (s < 0.55) {
                 // Bunting strung between the two eaves
                 const at = sagString(pi(0.75, yt - 0.03), pj(0.75, yt - 0.03), 0.07, WHITE, m);
                 for (let f = 0; f < 5; f++) {

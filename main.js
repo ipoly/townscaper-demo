@@ -790,7 +790,7 @@ function updateGulls(t) {
 }
 
 // --- World ---
-let grid, town, gridLines, seed;
+let grid, town, gridLines, seed, townStyle = DEFAULT_STYLE;
 // Town meshes per chunk: id -> { mesh, lines }; only chunks an edit touched are replaced
 const townGroup = new THREE.Group();
 scene.add(townGroup);
@@ -801,6 +801,7 @@ function newWorld(worldSeed, fill = seedTown) {
   seed = worldSeed;
   grid = generateGrid({ radius: 5, seed });
   town = new Town(grid);
+  town.setStyle(townStyle);
   if (gridLines) { scene.remove(gridLines); gridLines.geometry.dispose(); }
   const pts = [];
   for (const q of grid.quads) {
@@ -1176,7 +1177,7 @@ function encodeTown() {
     bin += String.fromCharCode(d.v >> 8, d.v & 255, (d.L << 4) | (d.auto ? 15 : d.color));
   }
   const packed = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `s=${seed}&t=${packed}`;
+  return `s=${seed}&t=${packed}` + (townStyle === DEFAULT_STYLE ? '' : `&style=${townStyle}`);
 }
 
 function loadFromHash() {
@@ -1185,6 +1186,8 @@ function loadFromHash() {
   if (!params.has('s') || !Number.isInteger(s)) return false;
   let bin;
   try { bin = atob((params.get('t') || '').replace(/-/g, '+').replace(/_/g, '/')); } catch { return false; }
+  townStyle = STYLES[params.get('style')] ? params.get('style') : DEFAULT_STYLE;
+  syncStyle();
   newWorld(s, null);
   const t0 = now() + 0.2;
   const cells = [];
@@ -1546,13 +1549,19 @@ function litColors(colors, up) {
   mat.dispose();
   return out;
 }
-const { walls: PALETTE, roofs: ROOF_OF } = STYLES[DEFAULT_STYLE].palette;
-const LIT = litColors(PALETTE, 0), LIT_ROOF = litColors(ROOF_OF, 1);
-const swatches = [null, ...PALETTE.map((_, i) => i)].map((idx, n) => {
+// Each style's swatch colors, rendered the first time it is shown
+const litCache = new Map();
+function litOf(name) {
+  if (!litCache.has(name)) {
+    const { walls, roofs } = STYLES[name].palette;
+    litCache.set(name, { walls: litColors(walls, 0), roofs: litColors(roofs, 1) });
+  }
+  return litCache.get(name);
+}
+let LIT, LIT_ROOF;
+const swatches = [null, ...Array.from({ length: PALETTE_SIZE }, (_, i) => i)].map((idx, n) => {
   const el = document.createElement('button');
   el.className = 'swatch' + (idx === null ? ' auto' : '');
-  if (idx !== null) el.style.backgroundImage = `linear-gradient(${LIT_ROOF[idx]} 45%, ${LIT[idx]} 45%)`;
-  else el.style.background = `conic-gradient(${[1, 2, 3, 4, 5, 8, 7, 6, 1].map((i) => LIT[i]).join(', ')})`;
   el.dataset.tip = idx === null ? 'Auto color (0)' : `Color ${n} (${n})`;
   el.setAttribute('aria-label', idx === null ? 'Auto color' : `Color ${n}`);
   el.onclick = () => selectColor(idx);
@@ -1600,11 +1609,36 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'touch' && e.button !== 0) { cursorGrab = true; syncCursor(); }
 });
 addEventListener('pointerup', () => { if (cursorGrab) { cursorGrab = false; syncCursor(); } });
+// Swatches, cursor and the style button follow the town's building style
+function syncStyle() {
+  ({ walls: LIT, roofs: LIT_ROOF } = litOf(townStyle));
+  for (const { el, idx } of swatches) {
+    if (idx !== null) el.style.backgroundImage = `linear-gradient(${LIT_ROOF[idx]} 45%, ${LIT[idx]} 45%)`;
+    else el.style.background = `conic-gradient(${[1, 2, 3, 4, 5, 8, 7, 6, 1].map((i) => LIT[i]).join(', ')})`;
+  }
+  document.getElementById('btn-style').dataset.tip = `Building style: ${STYLES[townStyle].label} (B)`;
+  syncCursor();
+}
+// The whole town switches at once; the style is saved with it in the link
+function setTownStyle(name) {
+  if (!STYLES[name] || name === townStyle) return;
+  townStyle = name;
+  town.setStyle(name);
+  syncStyle();
+  rebuild();
+  scheduleSave();
+  toast(`${STYLES[name].label} style`);
+}
+function nextStyle() {
+  const names = Object.keys(STYLES);
+  setTownStyle(names[(names.indexOf(townStyle) + 1) % names.length]);
+}
 function selectColor(idx) {
   selectedColor = idx;
   for (const s of swatches) s.el.classList.toggle('active', s.idx === idx);
   syncCursor();
 }
+syncStyle();
 selectColor(null);
 
 function clearTown() {
@@ -1655,6 +1689,7 @@ setHelp((() => { try { return localStorage.getItem('ts-help') === '1'; } catch {
 const buttons = {
   'btn-new': randomIsland,
   'btn-showcase': showcase,
+  'btn-style': nextStyle,
   'btn-mood': () => setMood((moodIndex + 1) % MOODS.length),
   'btn-rain': () => setRain(!raining),
   'btn-grid': toggleGrid,
@@ -1689,6 +1724,7 @@ addEventListener('keydown', (e) => {
   }
   if (key === 'r') randomIsland();
   if (key === 't') showcase();
+  if (key === 'b') nextStyle();
   if (key === 'c') clearTown();
   if (key === 'g') toggleGrid();
   if (key === 'h' || e.key === '?') setHelp(helpEl.classList.contains('hidden'));
@@ -1786,5 +1822,5 @@ if ('serviceWorker' in navigator) {
 
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
-  undo, redo, setMood, setRain, setOrbit, starter: () => newWorld(42, starterTown), world: (s) => newWorld(s), encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
+  undo, redo, setMood, setRain, setOrbit, setStyle: setTownStyle, starter: () => newWorld(42, starterTown), world: (s) => newWorld(s), encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
 };
