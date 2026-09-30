@@ -20,10 +20,7 @@ export const ARCH_RISE = 0.4;
 export const DECK = 0.24;
 export const POND_Y = 0.12;
 
-export const PALETTE = ['#f6f3ec', '#fbe6b3', '#f2c85b', '#fcc28d', '#ff9592', '#ffd9e2', '#b0dfa3', '#83e4d5', '#cce9ff'];
-export const ROOF_OF = ['#c95a37', '#158374', '#474e55', '#af3d36', '#874465', '#624377', '#b17300', '#335189', '#4978a7'];
-export const WALLS = PALETTE.map((c) => new THREE.Color(c));
-export const ROOFS = ROOF_OF.map((c) => new THREE.Color(c));
+export const PALETTE_SIZE = 9; // wall + roof color pairs in every style
 export const STONE = new THREE.Color('#b8a58a');
 export const PLAZA = new THREE.Color('#dccfb4');
 export const GRASS = new THREE.Color('#9cc27a');

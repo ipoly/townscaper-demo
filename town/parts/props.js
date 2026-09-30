@@ -1,12 +1,13 @@
 // Small things around the houses: fountains, trees, fences, potted plants, strings of bunting
 // and washing across streets, street lamps and benches, terrace parasols, ducks and lily pads.
 
-import { WHITE, TRUNK, WATER, GOLD, SLATE, LAMP, WOOD, LILY, BLOSSOM, TERRACOTTA, UMBRELLAS, LEAVES, yBottom, hash, pickFrom, WALLS, SHUTTERS } from '../constants.js';
+import { WHITE, TRUNK, WATER, GOLD, SLATE, LAMP, WOOD, LILY, BLOSSOM, TERRACOTTA, UMBRELLAS, LEAVES, yBottom, hash, pickFrom, SHUTTERS } from '../constants.js';
 import { p3, lerp2, offset } from '../emitter.js';
 
-// ctx: the build context (emitter tools, town, verts, units, infoOf) plus the parts made before
+// ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function propParts(ctx) {
-  const { quad, blob, box, prism, cone, bar, sagString, hanging, town, verts } = ctx;
+  const { quad, blob, box, prism, cone, bar, sagString, hanging, town, verts, kit } = ctx;
+  const WALLS = kit.walls;
 
   const fountain = (c2, y, scale, m) => {
     prism(c2, 0.34 * scale, y, y + 0.12, 8, WHITE, m, WATER);

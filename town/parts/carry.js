@@ -4,7 +4,7 @@
 import { ARCH_RISE, DECK, STONE, WINDOW, WHITE, SLATE, LAMP, WOOD, LEAVES, yBottom, yTop, hash, pickFrom } from '../constants.js';
 import { p3, lerp2, ring, offset } from '../emitter.js';
 
-// ctx: the build context (emitter tools, town, verts, units, infoOf) plus the parts made before
+// ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function carryParts(ctx) {
   const { tri, quad, box, prism, bar, hanging, town, verts } = ctx;
 

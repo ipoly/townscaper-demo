@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { generateGrid, mulberry32 } from './grid.js';
-import { Town, MAX_LEVEL, PALETTE, ROOF_OF, levelPlaneY } from './town.js';
+import { Town, MAX_LEVEL, PALETTE_SIZE, STYLES, DEFAULT_STYLE, levelPlaneY } from './town.js';
 import { Sfx } from './audio.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -1191,7 +1191,7 @@ function loadFromHash() {
   for (let i = 0; i + 2 < bin.length; i += 3) {
     const v = (bin.charCodeAt(i) << 8) | bin.charCodeAt(i + 1);
     const L = bin.charCodeAt(i + 2) >> 4, c = bin.charCodeAt(i + 2) & 15;
-    if (v < grid.verts.length && L < MAX_LEVEL && (c === 15 || c < PALETTE.length)) cells.push({ v, L, c });
+    if (v < grid.verts.length && L < MAX_LEVEL && (c === 15 || c < PALETTE_SIZE)) cells.push({ v, L, c });
   }
   // Lower floors first so auto colors inherit the same way they did when built
   cells.sort((a, b) => a.L - b.L);
@@ -1546,6 +1546,7 @@ function litColors(colors, up) {
   mat.dispose();
   return out;
 }
+const { walls: PALETTE, roofs: ROOF_OF } = STYLES[DEFAULT_STYLE].palette;
 const LIT = litColors(PALETTE, 0), LIT_ROOF = litColors(ROOF_OF, 1);
 const swatches = [null, ...PALETTE.map((_, i) => i)].map((idx, n) => {
   const el = document.createElement('button');
@@ -1684,7 +1685,7 @@ addEventListener('keydown', (e) => {
   if (mod) return;
   if (e.key >= '0' && e.key <= '9') {
     const n = Number(e.key);
-    if (n <= PALETTE.length) selectColor(n === 0 ? null : n - 1);
+    if (n <= PALETTE_SIZE) selectColor(n === 0 ? null : n - 1);
   }
   if (key === 'r') randomIsland();
   if (key === 't') showcase();

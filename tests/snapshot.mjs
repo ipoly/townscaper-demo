@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 register('./resolve-three.mjs', import.meta.url);
 const { generateGrid, mulberry32 } = await import('../grid.js');
-const { Town, MAX_LEVEL, PALETTE } = await import('../town.js');
+const { Town, MAX_LEVEL, PALETTE_SIZE, STYLES, DEFAULT_STYLE } = await import('../town.js');
 
 const here = (f) => new URL(f, import.meta.url);
 const fixtures = JSON.parse(readFileSync(here('./fixtures.json'), 'utf8'));
@@ -39,12 +39,12 @@ function fuzz(seed) {
   for (let i = 0; i < 70; i++) {
     const v = free[Math.floor(rand() * free.length)];
     const h = Math.floor(rand() * rand() * 7);
-    const c = rand() < 0.4 ? 15 : Math.floor(rand() * PALETTE.length);
+    const c = rand() < 0.4 ? 15 : Math.floor(rand() * PALETTE_SIZE);
     for (let L = 0; L <= h; L++) put(v, L, c);
   }
   for (let i = 0; i < 25; i++) {
     const v = free[Math.floor(rand() * free.length)];
-    put(v, 1 + Math.floor(rand() * (MAX_LEVEL - 2)), rand() < 0.5 ? 15 : Math.floor(rand() * PALETTE.length));
+    put(v, 1 + Math.floor(rand() * (MAX_LEVEL - 2)), rand() < 0.5 ? 15 : Math.floor(rand() * PALETTE_SIZE));
   }
   return { grid, cells: cells.sort((a, b) => a.L - b.L) };
 }
@@ -97,9 +97,28 @@ for (const seed of [11, 12, 13]) {
     const v = free[Math.floor(rand() * free.length)];
     let L = 0;
     while (town.has(v, L) && L < MAX_LEVEL - 1) L++;
-    place(town, grid, { v, L, c: rand() < 0.5 ? 15 : Math.floor(rand() * PALETTE.length) });
+    place(town, grid, { v, L, c: rand() < 0.5 ? 15 : Math.floor(rand() * PALETTE_SIZE) });
   }
   results[`fuzz${seed}-edited`] = fingerprint(town.buildChunks());
+}
+
+// Switching style rebuilds every chunk, and switching back gives the original geometry exactly
+{
+  const base = STYLES[DEFAULT_STYLE];
+  STYLES.__test = { ...base, name: '__test', walls: [...base.walls].reverse(), roofs: [...base.roofs].reverse() };
+  const { grid, cells } = decode(fixtures.seed1);
+  const town = new Town(grid);
+  for (const c of cells) place(town, grid, c);
+  const before = fingerprint(town.buildChunks()).hash;
+  town.setStyle('__test');
+  const other = town.buildChunks();
+  const allDirty = other.chunks.every((ch) => ch.dirty || ch.empty);
+  town.setStyle(DEFAULT_STYLE);
+  const back = fingerprint(town.buildChunks()).hash;
+  delete STYLES.__test;
+  const ok = allDirty && fingerprint(other).hash !== before && back === before;
+  console.log(`${ok ? 'ok  ' : 'FAIL'} style switch     rebuilds and switches back exactly`);
+  if (!ok) process.exitCode = 1;
 }
 
 const file = here('./snapshot.json');

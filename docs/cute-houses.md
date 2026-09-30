@@ -303,3 +303,10 @@ step keeps the geometry byte for byte the same.
   now: its locals are shared too tightly to split mechanically, so pieces come out when a style
   needs them. town.js went from 2403 to 1324 lines. Snapshot identical; checked with ESLint
   no-undef as well, since a missing import would only fail on the branch that uses it.
+- 2026-09-30: step 4, the style kit. The palette moved from constants to town/styles/european.js,
+  the first kit; town/styles/index.js lists the kits and checks each has PALETTE_SIZE wall + roof
+  pairs, so a block's color index means the same slot in every style. Town has `style`, `kit` and
+  `setStyle(name)`; the style name leads every quad's signature, so a switch rebuilds everything
+  through the usual caches. The snapshot test also switches seed1 to a scratch kit and back, which
+  must rebuild every chunk and return the exact original geometry. The swatches in main.js read
+  the default kit for now. Snapshot identical.

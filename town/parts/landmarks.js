@@ -3,7 +3,7 @@
 import { WINDOW, WHITE, COPPER, GOLD, SLATE, LH_RED, LAMP } from '../constants.js';
 import { ring } from '../emitter.js';
 
-// ctx: the build context (emitter tools, town, verts, units, infoOf) plus the parts made before
+// ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function landmarkParts(ctx) {
   const { E, tri, blob, box, prism, cone, infoOf } = ctx;
 

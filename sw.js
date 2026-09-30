@@ -14,6 +14,8 @@ const CORE = [
   './town/parts/roofs.js',
   './town/parts/carry.js',
   './town/parts/walls.js',
+  './town/styles/index.js',
+  './town/styles/european.js',
   './grid.js',
   './audio.js',
   './manifest.webmanifest',

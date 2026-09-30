@@ -1,11 +1,12 @@
 // Roof pieces beyond the slopes themselves: overhanging eaves, dormers, roofs over walkways.
 
-import { EAVE, EAVE_DROP, EAVE_RIM, ROOFS, WINDOW, GOLD, SLATE, LAMP, WOOD } from '../constants.js';
+import { EAVE, EAVE_DROP, EAVE_RIM, WINDOW, GOLD, SLATE, LAMP, WOOD } from '../constants.js';
 import { p3, lerp2 } from '../emitter.js';
 
-// ctx: the build context (emitter tools, town, verts, units, infoOf) plus the parts made before
+// ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function roofParts(ctx) {
-  const { E, tri, quad, box, prism, cone, bar } = ctx;
+  const { E, tri, quad, box, prism, cone, bar, kit } = ctx;
+  const ROOFS = kit.roofs;
 
   // Overhanging eaves where roof quadrant i meets an outer wall: a thick wedge carrying the
   // slope out past the wall. At the edge midpoint a strip ends where the neighbouring quad's

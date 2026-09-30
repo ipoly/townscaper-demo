@@ -1,4 +1,4 @@
-// Generates the wall and roof palettes for town/constants.js in OKLCH. Each color choice is a wall + roof pair,
+// Generates the wall and roof palettes for town/styles/european.js in OKLCH. Each color choice is a wall + roof pair,
 // and the pairs are searched together so that even the two most alike pairs stay easy to tell apart.
 // Not used at runtime: run it, then paste the printed arrays.
 //   cd tools && npm i --no-save colorjs.io@0.7 && node palette.mjs [--table]

@@ -8,7 +8,8 @@
 // an edit only re-emits the quads whose inputs actually changed.
 
 import * as THREE from 'three';
-import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, SPIRE_RISE, ARCH_RISE, DECK, POND_Y, PALETTE, WALLS, ROOFS, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, GOLD, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, yBottom, yTop, hash, pickFrom } from './town/constants.js';
+import { MAX_LEVEL, ROOF_RISE, EAVE, EAVE_DROP, RIDGE_R, CORNER, SPIRE_RISE, ARCH_RISE, DECK, POND_Y, STONE, PLAZA, GRASS, ROOF_FLAT, GARDEN, WHITE, BRICK, FOAM, GOLD, SLATE, LH_RED, LAMP, WOOD, PLANKS, DECK_TOP, SHADOW, POND_COLORS, BANK, REED, TERRACE, UMBRELLAS, LEAVES, SHUTTERS, yBottom, yTop, hash, pickFrom, PALETTE_SIZE } from './town/constants.js';
+import { STYLES, DEFAULT_STYLE } from './town/styles/index.js';
 import { Emitter, p3, lerp2, offset } from './town/emitter.js';
 import { propParts } from './town/parts/props.js';
 import { landmarkParts } from './town/parts/landmarks.js';
@@ -16,7 +17,8 @@ import { roofParts } from './town/parts/roofs.js';
 import { carryParts } from './town/parts/carry.js';
 import { wallParts } from './town/parts/walls.js';
 
-export { MAX_LEVEL, PALETTE, ROOF_OF, levelPlaneY } from './town/constants.js';
+export { MAX_LEVEL, PALETTE_SIZE, levelPlaneY } from './town/constants.js';
+export { STYLES, DEFAULT_STYLE } from './town/styles/index.js';
 
 // Outline pairing: an edge shared by two triangles is drawn only at a crease, and belongs
 // to the triangle that was born later so it pops in with that block
@@ -63,7 +65,7 @@ export class Town {
     this.grid = grid;
     this.cells = new Set();
     this.born = new Map(); // cell key -> time (s) the pop animation starts
-    this.colorIndex = new Map(); // cell key -> PALETTE index
+    this.colorIndex = new Map(); // cell key -> palette index
     this.autoColor = new Set(); // cells whose color was not picked by the player
     this.vertexQuads = grid.verts.map(() => []);
     for (const q of grid.quads) for (const v of q) this.vertexQuads[v].push(q);
@@ -83,6 +85,14 @@ export class Town {
     this.records = [];
     this.vertexCache = new Map(); // grid vertex -> merged outline of edges standing on it
     this.chunks = null; // laid out on the first buildChunks()
+    this.style = DEFAULT_STYLE; // building style for the whole town, see town/styles
+  }
+
+  get kit() { return STYLES[this.style]; }
+  // Takes effect on the next build: the style is part of every quad's signature
+  setStyle(name) {
+    if (!STYLES[name]) throw new Error(`Unknown style ${name}`);
+    this.style = name;
   }
 
   key(v, L) { return v * 64 + L; }
@@ -134,14 +144,14 @@ export class Town {
 
   canBuild(v, L) { return !this.grid.fixed[v] && L >= 0 && L < MAX_LEVEL; }
 
-  // color: PALETTE index, or null to inherit from the block below / pick by hash
+  // color: palette index, or null to inherit from the block below / pick by hash
   add(v, L, born = -100, color = null) {
     if (!this.canBuild(v, L) || this.has(v, L)) return false;
     const k = this.key(v, L);
     if (color === null) {
       this.autoColor.add(k);
       const below = this.colorIndex.get(this.key(v, L - 1));
-      color = L > 1 && below !== undefined ? below : Math.floor(hash(v, 99) * PALETTE.length);
+      color = L > 1 && below !== undefined ? below : Math.floor(hash(v, 99) * PALETTE_SIZE);
     }
     this.cells.add(k);
     this.born.set(k, born);
@@ -223,7 +233,7 @@ export class Town {
     const { neighbors, verts } = this.grid;
     const ground = new Map(); // v -> unit
     const roof = new Map(); // cell key -> unit
-    const rowColor = new Map(); // v -> PALETTE index for row houses
+    const rowColor = new Map(); // v -> palette index for row houses
     const ponds = this.findPonds();
     const water = (v) => neighbors[v].filter((u) => !this.has(u, 0) && !ponds.has(u));
 
@@ -302,7 +312,7 @@ export class Town {
             if (final.has(c)) continue;
             const taken = neighbors[c].filter((u) => unit.set.has(u) && final.has(u)).map((u) => final.get(u));
             let ci = this.colorIndex.get(this.key(c, L));
-            for (let s = 0; taken.includes(ci) && s < PALETTE.length; s++) ci = (ci + 4) % PALETTE.length;
+            for (let s = 0; taken.includes(ci) && s < PALETTE_SIZE; s++) ci = (ci + 4) % PALETTE_SIZE;
             final.set(c, ci);
             rowColor.set(c, ci);
           }
@@ -730,8 +740,9 @@ export class Town {
       }
       return e;
     };
+    const kit = this.kit, WALLS = kit.walls, ROOFS = kit.roofs;
     const signature = (q) => {
-      let s = '';
+      let s = kit.name;
       for (const v of q) {
         s += '|';
         for (let L = 0; L < MAX_LEVEL; L++) if (this.has(v, L)) s += L + infoOf(v, L).json;
@@ -745,7 +756,7 @@ export class Town {
     const E = new Emitter((m) => this.pivot(m.v, m.L), (m) => m.pond ?? infoOf(m.v, m.L).info);
     const { tri, quad, blob, box, prism, cone, ridgeCap, sagString, hanging } = E;
     // Building parts, each made from the tools, the town and the parts made before it
-    const ctx = { E, tri, quad, blob, box, prism, cone, bar: E.bar, ridgeCap, sagString, hanging, town: this, verts, units, infoOf };
+    const ctx = { E, tri, quad, blob, box, prism, cone, bar: E.bar, ridgeCap, sagString, hanging, town: this, kit, verts, units, infoOf };
     for (const make of [propParts, landmarkParts, roofParts, carryParts, wallParts]) Object.assign(ctx, make(ctx));
     const { fountain, tree, fence, plants, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
 

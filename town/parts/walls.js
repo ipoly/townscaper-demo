@@ -4,7 +4,7 @@
 import { AO_BAND, AO_FOOT, AO_EAVES, DECK, STONE, WINDOW, CURTAINS, IVY, WHITE, FOAM, GOLD, SLATE, LAMP, WOOD, SHADOW, TERRACOTTA, UMBRELLAS, BLOOMS, LEAVES, SHUTTERS, DOORS, yBottom, yTop, hash, pickFrom } from '../constants.js';
 import { p3, lerp2 } from '../emitter.js';
 
-// ctx: the build context (emitter tools, town, verts, units, infoOf) plus the parts made before
+// ctx: the build context (emitter tools, town, style kit, verts, units, infoOf) plus the parts made before
 export function wallParts(ctx) {
   const { E, tri, quad, blob, box, prism, cone, bar, town, verts, units, infoOf, fence } = ctx;
 
