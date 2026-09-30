@@ -69,6 +69,10 @@
       font: 600 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
       background: var(--line); color: var(--ink);
     }
+    .chip {
+      padding: 0 6px; border: 0; border-radius: 4px; cursor: pointer;
+      font: 600 11px/1.6 system-ui, -apple-system, sans-serif; background: var(--line); color: var(--ink);
+    }
     #help-open { position: fixed; left: 16px; top: 16px; transition: opacity 0.2s; }
     #help-open.hidden { opacity: 0; pointer-events: none; }
 
@@ -241,9 +245,10 @@
     </dl>
     <h2 class="mouse-only">Camera</h2>
     <dl class="mouse-only">
-      <dt>Right drag</dt><dd>Orbit</dd>
-      <dt>Middle drag</dt><dd>Pan</dd>
-      <dt>Wheel</dt><dd>Zoom</dd>
+      <dt>Right / <kbd>⌥</kbd> + drag</dt><dd>Orbit</dd>
+      <dt>Middle / <kbd>⌘</kbd> <kbd>Space</kbd> + drag</dt><dd>Pan</dd>
+      <dt>Wheel · pinch</dt><dd>Zoom</dd>
+      <dt>Two-finger scroll</dt><dd>Orbit on a trackpad · <button id="btn-scroll" class="chip">Auto</button></dd>
     </dl>
     <h2 class="mouse-only">Keys</h2>
     <dl class="mouse-only">

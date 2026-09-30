@@ -1330,7 +1330,26 @@ document.addEventListener('visibilitychange', () => { lastInput = now(); });
 // --- Input ---
 // Left click/drag: build on the level of the first block of the stroke; occupied cells stack upwards
 // Shift + left drag: remove on one level · Right click: remove · Right drag: orbit · Middle drag: pan
+// Trackpads have no middle button and right drags are awkward there, so Option + drag orbits and
+// Cmd + drag or Space + drag pans too
 controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+let spaceHeld = false;
+function cameraDrag(e) {
+  return e.pointerType !== 'touch' && e.button === 0 && (e.altKey || e.metaKey || spaceHeld);
+}
+// Set before OrbitControls reads the press. It turns a rotate into a pan when Cmd is held
+addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') return;
+  controls.mouseButtons.LEFT = !cameraDrag(e) ? null : e.altKey || e.metaKey ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
+}, { capture: true });
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.repeat) return;
+  e.preventDefault();
+  spaceHeld = true;
+  syncCursor();
+});
+addEventListener('keyup', (e) => { if (e.code === 'Space') { spaceHeld = false; syncCursor(); } });
+addEventListener('blur', () => { spaceHeld = false; });
 let downAt = null, lastMove = null;
 let stroke = null; // { mode: 'build' | 'erase', L, last: [x, y], lastV, dragging }
 controls.addEventListener('change', () => { hoverDirty = true; });
@@ -1490,7 +1509,7 @@ for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch') { touchDown(e); return; }
   downAt = [e.clientX, e.clientY];
-  if (e.button !== 0) return;
+  if (e.button !== 0 || cameraDrag(e)) return;
   if (beginStroke(e.clientX, e.clientY, e.shiftKey)) renderer.domElement.setPointerCapture(e.pointerId);
 });
 renderer.domElement.addEventListener('pointermove', (e) => {
@@ -1516,6 +1535,63 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   const hit = pick(e.clientX, e.clientY);
   if (hit && hit.meta && removeCell(hit.meta.v, hit.meta.L)) commit();
 });
+
+// Trackpad: two-finger scroll orbits and a pinch zooms, while a notched mouse wheel still zooms.
+// A scroll is classified on its first event and keeps that until it pauses; the help card can
+// pin it to one or the other where the guess goes wrong (smooth mouse wheels)
+const SCROLL_MODES = ['auto', 'orbit', 'zoom'], SCROLL_GAP = 250, SCROLL_ORBIT_SPEED = 0.6;
+let scrollMode = (() => { try { return localStorage.getItem('ts-scroll'); } catch { return null; } })();
+if (!SCROLL_MODES.includes(scrollMode)) scrollMode = 'auto';
+let scrollKind = null, scrollLast = -Infinity, pinching = false, pinchScale = 1;
+function wheelKind(e) {
+  if (e.ctrlKey) return 'zoom'; // pinches arrive as wheel events with Ctrl held
+  if (scrollMode !== 'auto') return scrollMode;
+  if (e.deltaMode !== 0) return 'zoom';
+  if (e.deltaX !== 0) return 'orbit';
+  // Notched wheels step by 120 in the legacy delta; trackpads report three times the pixel delta
+  if (e.wheelDeltaY) return e.wheelDeltaY % 120 === 0 ? 'zoom' : 'orbit';
+  return Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50 ? 'zoom' : 'orbit';
+}
+document.addEventListener('wheel', (e) => {
+  if (e.target !== renderer.domElement) return;
+  if (pinching && e.ctrlKey) { e.preventDefault(); e.stopPropagation(); return; }
+  const t = performance.now();
+  if (t - scrollLast > SCROLL_GAP || (e.ctrlKey && scrollKind !== 'zoom')) scrollKind = wheelKind(e);
+  scrollLast = t;
+  if (scrollKind !== 'orbit') return; // OrbitControls zooms
+  e.preventDefault();
+  e.stopPropagation();
+  // Same feel as dragging: the view follows the fingers
+  const k = (2 * Math.PI * SCROLL_ORBIT_SPEED) / renderer.domElement.clientHeight;
+  controls._rotateLeft(-e.deltaX * k);
+  controls._rotateUp(-e.deltaY * k);
+}, { capture: true, passive: false });
+// Safari sends pinches as gesture events instead, and zooms the whole page unless stopped
+document.addEventListener('gesturestart', (e) => {
+  e.preventDefault();
+  lastInput = now();
+  if (orbiting) setOrbit(false);
+  pinching = true;
+  pinchScale = 1;
+});
+document.addEventListener('gesturechange', (e) => {
+  e.preventDefault();
+  if (!pinching || !e.scale) return;
+  controls._dollyOut(e.scale / pinchScale);
+  pinchScale = e.scale;
+});
+document.addEventListener('gestureend', (e) => { e.preventDefault(); pinching = false; });
+function syncScrollMode() {
+  const el = document.getElementById('btn-scroll');
+  el.textContent = { auto: 'Auto', orbit: 'Orbit', zoom: 'Zoom' }[scrollMode];
+  el.setAttribute('aria-label', `Two-finger scroll: ${el.textContent}`);
+}
+function nextScrollMode() {
+  scrollMode = SCROLL_MODES[(SCROLL_MODES.indexOf(scrollMode) + 1) % SCROLL_MODES.length];
+  try { localStorage.setItem('ts-scroll', scrollMode); } catch {}
+  syncScrollMode();
+}
+syncScrollMode();
 
 // --- Color palette: "auto" inherits from the block below, otherwise paints new blocks ---
 let selectedColor = null;
@@ -1598,6 +1674,7 @@ const ORBIT_BODY = "<circle cx='12' cy='12' r='7' fill='rgba(255,255,255,0.18)' 
 function syncCursor() {
   const el = renderer.domElement;
   if (cursorGrab) { el.style.cursor = 'grabbing'; return; }
+  if (spaceHeld) { el.style.cursor = 'grab'; return; }
   const body = orbiting ? ORBIT_BODY : cursorShift ? ERASE_BODY : dabBody();
   el.style.cursor = `${svgUrl(body, 1)} 12 12, crosshair`;
   // Sharp on high-density screens where image-set is understood; ignored (keeping the line above) elsewhere
@@ -1608,7 +1685,7 @@ for (const type of ['keydown', 'keyup']) {
 }
 addEventListener('blur', () => { cursorShift = false; syncCursor(); });
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  if (e.pointerType !== 'touch' && e.button !== 0) { cursorGrab = true; syncCursor(); }
+  if (e.pointerType !== 'touch' && (e.button !== 0 || cameraDrag(e))) { cursorGrab = true; syncCursor(); }
 });
 addEventListener('pointerup', () => { if (cursorGrab) { cursorGrab = false; syncCursor(); } });
 // Swatches, cursor and the style button follow the town's building style
@@ -1705,6 +1782,7 @@ const buttons = {
   'btn-erase': () => setTouchTool('erase'),
   'help-close': () => setHelp(false),
   'help-open': () => setHelp(true),
+  'btn-scroll': nextScrollMode,
 };
 for (const [id, fn] of Object.entries(buttons)) {
   const el = document.getElementById(id);

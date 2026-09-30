@@ -274,6 +274,12 @@ the original Townscaper.
   color like its swatch (a small color wheel for auto), and it changes as colors are picked. Holding
   Shift turns it into a red eraser ring, dragging the view shows a grabbing hand and orbit mode shows
   a faint ring. They are native SVG cursors, with 2x images for sharp screens, so they never lag.
+- 2026-09-30: trackpad support. Two-finger scroll now orbits the view (sideways turns it, up and
+  down tilts it) and a pinch zooms, while a notched mouse wheel still zooms. Each scroll is
+  classified on its first event from its legacy delta, and a Help card button pins it to orbit or
+  zoom for smooth mouse wheels that look like trackpads. Option + drag orbits and Cmd or Space +
+  drag pans, since trackpads have no middle button. Safari's pinch gestures zoom the camera instead
+  of the page.
 
 ## Refactor towards building styles
 
