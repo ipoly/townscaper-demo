@@ -21,15 +21,15 @@ the original Townscaper.
 - [x] 1. Roofs: steeper rise, overhanging eaves with a thick rim
 - [x] 2. Windows: one bigger centered window per face, no glazing bars, rounder variants
 - [x] 3. Outlines: warmer and much lighter
-- [ ] 4. Stilts: thicker posts, fewer braces
-- [ ] 5. Floor height: lower `LEVEL_H`, recheck stairs / doors / balconies
-- [ ] 6. Palette: +10-20% saturation on walls and roofs
+- [x] 4. Stilts: thicker posts, fewer braces
+- [x] 5. Floor height: lower `LEVEL_H`, recheck stairs / doors / balconies
+- [x] 6. Palette: +10-20% saturation on walls and roofs
 
 ### Phase 2: rounded volumes
 
-- [ ] Bevelled / rounded wall corners (transition faces at corners, keep outline pairing intact)
-- [ ] Rounded ridges and eaves
-- [ ] Simple vertex AO (wall feet, under eaves) to replace outlines
+- [x] Bevelled / rounded wall corners (transition faces at corners, keep outline pairing intact)
+- [~] Rounded ridges and eaves (eaves follow rounded corners; hip ridges deferred)
+- [x] Simple vertex AO (wall feet, under eaves) to replace outlines
 
 ## Progress log
 
@@ -44,3 +44,16 @@ the original Townscaper.
  - Outlines: `#2e2a28` @ 0.6 -> `#6b5446` @ 0.3.
  - Known leftovers: windows fold where a face kinks at its midpoint on the irregular grid; lean-to
    roofs (now higher) hide more of the lower part of the taller neighbour's windows.
+- 2026-09-30: phase 1 items 4-6 done.
+ - Posts: colonnade prisms r 0.08, timber posts 0.055 with small knees, stilts 0.085 and tall pillars
+   up to 0.13 without braces; stems 0.28. Posts sit closer to the quad center (`lerp2(Q,c,0.2)`).
+ - Floors: `LEVEL_H` 0.85 -> 0.75; window, door and balcony heights shifted to fit.
+ - Palette: brighter walls and more saturated roofs; the "auto" swatch in `index.html` follows.
+- 2026-09-30: phase 2 done (except rounded hip ridges).
+ - Rounded corners: `cornerArc()` replaces the Q corner of an isolated outer quadrant (floor above
+   ground, 3 empty neighbours at that level, normal style) with a small arc (`CORNER`). Walls stop at
+   the arc, arc facets become wall faces, roofs / terraces / porches are fanned over the new rim.
+ - Eaves follow the arc. Ledges close the gap between stacked floors whose corners differ.
+ - AO: walls are split into bands (`AO_BAND`); vertices at wall feet (`AO_FOOT`) and under eaves
+   (`AO_EAVES`) are darkened through `shadeFn` in `tri()`.
+ - Known leftovers: ground-floor and walkway corners stay sharp; hip ridges are not rounded.

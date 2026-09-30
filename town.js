@@ -17,6 +17,10 @@ const ROOF_RISE = 0.6;
 const EAVE = 0.09; // how far roofs overhang the walls
 const EAVE_DROP = 0.07;
 const EAVE_RIM = 0.04;
+const CORNER = 0.12; // how far a rounded outer corner reaches along each wall
+const AO_BAND = 0.2; // height of the darker band at a wall's foot or under its eaves
+const AO_FOOT = 0.8;
+const AO_EAVES = 0.84;
 const SPIRE_RISE = 1.3;
 const ARCH_RISE = 0.4;
 const DECK = 0.24;
@@ -784,6 +788,7 @@ export class Town {
     let R = null;
     let noOutline = false;
     let waveFn = null; // per-vertex sway weight for hanging cloth
+    let shadeFn = null; // per-vertex color multiplier, for baked occlusion
 
     const tri = (a, b, c, hint, color, m) => {
       const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
@@ -799,7 +804,8 @@ export class Town {
       for (const p of [a, b, c]) {
         R.position.push(p[0], p[1], p[2]);
         R.normal.push(n[0], n[1], n[2]);
-        R.color.push(color.r, color.g, color.b);
+        const k = shadeFn ? shadeFn(p) : 1;
+        R.color.push(color.r * k, color.g * k, color.b * k);
         R.aPivot.push(pv[0], pv[1], pv[2]);
         R.aBorn.push(cell.b);
         R.aGlow.push(glow);
@@ -991,16 +997,30 @@ export class Town {
 
     // Overhanging eaves where roof quadrant i meets an outer wall: a thick wedge carrying the
     // slope out past the wall. At the edge midpoint a strip ends where the neighbouring quad's
-    // strip starts; at the quad center it meets the next wall's strip on their mitred line.
+    // strip starts; at the quad center it meets the next wall's strip on their mitred line, or
+    // follows a rounded corner (arc).
     // eaved[k]: quadrant k gets eaves too, otherwise the open end of the wedge is capped.
-    const eaves = (i, C, M, Q, occ, eaved, y, color, m) => {
+    const eaves = (i, C, M, Q, occ, eaved, arc, y, color, m) => {
       const unit = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+      const out = (p, d) => [p[0] + d[0] * EAVE, p[1] + d[1] * EAVE];
+      const yo = y - EAVE_DROP, yb = yo - EAVE_RIM;
+      const shade = color.clone().multiplyScalar(0.55);
+      // Wedge from wall top A->B out to Ao->Bo
+      const strip = (A, B, Ao, Bo) => {
+        const d = unit(A, B), mid = lerp2(Ao, Bo, 0.5), base = lerp2(A, B, 0.5);
+        quad(p3(A, y), p3(B, y), p3(Bo, yo), p3(Ao, yo), [0, 1, 0], color, m);
+        quad(p3(Ao, yo), p3(Bo, yo), p3(Bo, yb), p3(Ao, yb), [mid[0] - base[0], 0, mid[1] - base[1]], color, m);
+        noOutline = true;
+        quad(p3(A, y), p3(B, y), p3(Bo, yb), p3(Ao, yb), [0, -1, 0], shade, m);
+        noOutline = false;
+        return d;
+      };
       // Wall segment k (between quadrants k and k+1) offset by EAVE towards its empty side
       const line = (k) => {
         const d = unit(Q, M[k]), c = C[occ[k] ? (k + 1) % 4 : k];
         let nrm = [-d[1], d[0]];
         if ((c[0] - Q[0]) * nrm[0] + (c[1] - Q[1]) * nrm[1] < 0) nrm = [-nrm[0], -nrm[1]];
-        return { p: [Q[0] + nrm[0] * EAVE, Q[1] + nrm[1] * EAVE], d, nrm };
+        return { p: out(Q, nrm), d, nrm };
       };
       const meet = (l1, l2) => {
         const det = l1.d[0] * l2.d[1] - l1.d[1] * l2.d[0];
@@ -1009,29 +1029,45 @@ export class Town {
         const x = [l1.p[0] + l1.d[0] * t, l1.p[1] + l1.d[1] * t];
         return Math.hypot(x[0] - Q[0], x[1] - Q[1]) < EAVE * 3 ? x : null;
       };
+      const n = (i + 1) % 4, p = (i + 3) % 4;
+      const mOut = (k, j) => out(M[k], unit(C[i], C[j]));
+      if (arc) {
+        const { pts, nrm } = arc, last = pts.length - 1;
+        strip(M[i], pts[0], mOut(i, n), out(pts[0], nrm[0]));
+        for (let k = 0; k < last; k++) strip(pts[k], pts[k + 1], out(pts[k], nrm[k]), out(pts[k + 1], nrm[k + 1]));
+        strip(pts[last], M[p], out(pts[last], nrm[last]), mOut(p, p));
+        return;
+      }
       const segs = [0, 1, 2, 3].filter((k) => occ[k] !== occ[(k + 1) % 4]);
-      const yo = y - EAVE_DROP, yb = yo - EAVE_RIM;
-      const shade = color.clone().multiplyScalar(0.55);
-      for (const [k, j] of [[i, (i + 1) % 4], [(i + 3) % 4, (i + 3) % 4]]) {
+      for (const [k, j] of [[i, n], [p, p]]) {
         if (occ[j]) continue;
         const own = line(k);
         // Checkerboard corners have four walls at the center: no single partner to mitre with
         const other = segs.length === 2 ? segs.find((s) => s !== k) : null;
         const qo = (other != null && meet(own, line(other))) || own.p;
-        const md = unit(C[i], C[j]);
-        const mo = [M[k][0] + md[0] * EAVE, M[k][1] + md[1] * EAVE];
-        const out = [own.nrm[0], 0, own.nrm[1]];
-        quad(p3(M[k], y), p3(Q, y), p3(qo, yo), p3(mo, yo), [0, 1, 0], color, m);
-        quad(p3(mo, yo), p3(qo, yo), p3(qo, yb), p3(mo, yb), out, color, m);
-        noOutline = true;
-        quad(p3(M[k], y), p3(Q, y), p3(qo, yb), p3(mo, yb), [0, -1, 0], shade, m);
-        noOutline = false;
+        const along = k === i ? strip(M[k], Q, mOut(k, j), qo) : strip(Q, M[k], qo, mOut(k, j));
         const partner = other == null ? -1 : occ[other] ? other : (other + 1) % 4;
         if (partner < 0 || !eaved[partner]) {
-          const along = unit(M[k], Q);
-          tri(p3(Q, y), p3(qo, yo), p3(qo, yb), [along[0], 0, along[1]], color, m);
+          const toQ = k === i ? along : [-along[0], -along[1]];
+          tri(p3(Q, y), p3(qo, yo), p3(qo, yb), [toQ[0], 0, toQ[1]], color, m);
         }
       }
+    };
+
+    // Wall face a->b between heights y0 and y1, darkened in soft bands where it stands on the
+    // ground (foot) or tucks under the eaves, in place of ambient occlusion
+    const face = (a, b, y0, y1, towards, color, m, foot, under) => {
+      const yA = foot ? y0 + AO_BAND : y0, yB = under ? y1 - AO_BAND : y1;
+      shadeFn = (pt) => (foot && pt[1] < y0 + 1e-4 ? AO_FOOT : under && pt[1] > y1 - 1e-4 ? AO_EAVES : 1);
+      if (foot) quad(p3(a, y0), p3(b, y0), p3(b, yA), p3(a, yA), towards, color, m);
+      quad(p3(a, yA), p3(b, yA), p3(b, yB), p3(a, yB), towards, color, m);
+      if (under) quad(p3(a, yB), p3(b, yB), p3(b, y1), p3(a, y1), towards, color, m);
+      shadeFn = null;
+    };
+    // Which bands a house wall of cell (v, L) gets
+    const aoBands = (v, L) => {
+      const I = infoOf(v, L).info;
+      return [L === 1 && this.has(v, 0), I.t && I.r > 0 && !I.lt];
     };
 
     // Dormer on a roof slope at c2 whose roof height is y, facing dir
@@ -1339,11 +1375,14 @@ export class Town {
     // Everything that decorates one wall segment a->b of cell (v, L).
     // Each wall between two cells is emitted in two halves that meet at the edge midpoint;
     // aIsM tells which end of this half is that midpoint.
-    const wall = (a, b, aIsM, towards, v, L, target, color, m, style, bridge, terrace) => {
+    // qEnd: where the face stops short of the quad center, at a rounded corner
+    const wall = (a, b, aIsM, towards, v, L, target, color, m, style, bridge, terrace, qEnd = null) => {
       // A walkway is a deck at the floor of its level, flush with the neighbours' floors
       const y1 = bridge ? yBottom(L) : yTop(L);
       const y0 = bridge ? y1 - DECK : yBottom(L);
-      quad(p3(a, y0), p3(b, y0), p3(b, y1), p3(a, y1), towards, color, m);
+      const fa = qEnd && !aIsM ? qEnd : a, fb = qEnd && aIsM ? qEnd : b;
+      if (bridge || L === 0) quad(p3(fa, y0), p3(fb, y0), p3(fb, y1), p3(fa, y1), towards, color, m);
+      else face(fa, fb, y0, y1, towards, color, m, ...aoBands(v, L));
 
       let nx = -(b[1] - a[1]), nz = b[0] - a[0];
       const len = Math.hypot(nx, nz) || 1;
@@ -1533,6 +1572,42 @@ export class Town {
         : I.st === 'l' ? 'lighthouse' : 'normal');
       const wallColorOf = (I, L, style = styleOf(I)) => (L === 0 ? (style === 'dock' ? WOOD : STONE)
         : style === 'lighthouse' ? (L % 2 ? WHITE : LH_RED) : WALLS[I.ci]);
+      // Outer corners of houses standing on the floor below are rounded: quadrant i's two walls
+      // meet the quad center on an arc tangent to both. Returns its points from the wall towards
+      // n to the wall towards p, with outward normals, or null when the corner stays sharp.
+      const cornerArc = (i, L) => {
+        if (L < 1 || !this.has(q[i], L) || !this.has(q[i], L - 1)) return null;
+        if ([1, 2, 3].some((d) => this.has(q[(i + d) % 4], L))) return null;
+        const I = infoOf(q[i], L).info;
+        if (I.br || styleOf(I) !== 'normal') return null;
+        const p = (i + 3) % 4;
+        const l1 = Math.hypot(M[i][0] - Q[0], M[i][1] - Q[1]), l2 = Math.hypot(M[p][0] - Q[0], M[p][1] - Q[1]);
+        const e1 = [(M[i][0] - Q[0]) / l1, (M[i][1] - Q[1]) / l1], e2 = [(M[p][0] - Q[0]) / l2, (M[p][1] - Q[1]) / l2];
+        const theta = Math.acos(Math.max(-1, Math.min(1, e1[0] * e2[0] + e1[1] * e2[1])));
+        if (theta > 2.97) return null; // barely a corner
+        const t = Math.min(CORNER, l1 * 0.3, l2 * 0.3), rad = t * Math.tan(theta / 2);
+        const bis = [e1[0] + e2[0], e1[1] + e2[1]], bl = Math.hypot(bis[0], bis[1]);
+        const dc = t / Math.cos(theta / 2);
+        const O = [Q[0] + (bis[0] / bl) * dc, Q[1] + (bis[1] / bl) * dc];
+        const a0 = Math.atan2(Q[1] + e1[1] * t - O[1], Q[0] + e1[0] * t - O[0]);
+        const a1 = Math.atan2(Q[1] + e2[1] * t - O[1], Q[0] + e2[0] * t - O[0]);
+        let da = a1 - a0;
+        if (da > Math.PI) da -= 2 * Math.PI;
+        if (da < -Math.PI) da += 2 * Math.PI;
+        // Facets under the outline crease angle, so the corner reads as smooth
+        const K = Math.max(2, Math.ceil(Math.abs(da) / 0.38));
+        const pts = [], nrm = [];
+        for (let k = 0; k <= K; k++) {
+          const a = a0 + (da * k) / K;
+          nrm.push([Math.cos(a), Math.sin(a)]);
+          pts.push([O[0] + Math.cos(a) * rad, O[1] + Math.sin(a) * rad]);
+        }
+        return { pts, nrm };
+      };
+      // Fan from c at height yc over a ring of [point, height], facing along hint
+      const fanOver = (c, yc, ring, hint, color, m) => {
+        for (let k = 0; k + 1 < ring.length; k++) tri(p3(c, yc), p3(...ring[k]), p3(...ring[k + 1]), hint, color, m);
+      };
 
       // Pond water sits above the sea waves and below the foundation tops
       q.forEach((v, i) => {
@@ -1603,17 +1678,20 @@ export class Town {
           const firstQuad = this.vertexQuads[v][0] === q; // emit per-column extras once
           const topMeta = { kind: 'top', v, L };
           const yt = yTop(L);
+          const arc = cornerArc(i, L);
+          // Outline of the quadrant's top from M[i] round the quad center to M[p]
+          const rim = (hN, hQ, hP) => [[M[i], hN], ...(arc ? arc.pts : [Q]).map((pt) => [pt, hQ]), [M[p], hP]];
 
           if (top[i] && br[i]) {
             const yd = yBottom(L);
             quad(p3(C[i], yd), p3(M[i], yd), p3(Q, yd), p3(M[p], yd), [0, 1, 0], DECK_TOP, topMeta);
             if (roofed[i]) canopy(v, L, I, q, i, C, M, Q, occ, br, roofed, yd, firstQuad, topMeta);
           } else if (top[i] && I.tr) {
-            quad(p3(C[i], yt), p3(M[i], yt), p3(Q, yt), p3(M[p], yt), [0, 1, 0], TERRACE, topMeta);
+            fanOver(C[i], yt, rim(yt, yt, yt), [0, 1, 0], TERRACE, topMeta);
             if (firstQuad) terraceProps(C[i], yt, v, L, topMeta);
           } else if (porch[i]) {
             // Covered porch under a block hovering over this column
-            quad(p3(C[i], yt), p3(M[i], yt), p3(Q, yt), p3(M[p], yt), [0, 1, 0], TERRACE, topMeta);
+            fanOver(C[i], yt, rim(yt, yt, yt), [0, 1, 0], TERRACE, topMeta);
             if (firstQuad && hash(v, L, 85) < 0.6) plants(C[i], yt, hash(v, L, 86), topMeta);
           } else if (top[i]) {
             // Hip roof: ridge runs along edges shared with same-height neighbours
@@ -1650,8 +1728,8 @@ export class Town {
             } else {
               color = ROOFS[I.rc ?? I.ci];
             }
-            quad(p3(C[i], hC), p3(M[i], hN), p3(Q, hQ), p3(M[p], hP), [0, 1, 0], color, topMeta);
-            if (eaved[i]) eaves(i, C, M, Q, occ, eaved, yt, color, topMeta);
+            fanOver(C[i], hC, rim(hN, hQ, hP), [0, 1, 0], color, topMeta);
+            if (eaved[i]) eaves(i, C, M, Q, occ, eaved, arc, yt, color, topMeta);
 
             if (firstQuad && I.lt) lighthouseTop(C[i], hC, topMeta);
             const isRow = I.ut === 'row';
@@ -1722,10 +1800,29 @@ export class Town {
             if (!occ[j]) {
               const bank = L === 0 && ['lily', 'lagoon'].includes(units.ponds.get(q[j])?.type);
               const side = bank ? BANK : wallColor;
-              wall(a, b, aIsM, dir, v, L, q[j], side, m, style, br[i] && I.bs, top[i] && (I.tr || porch[i]));
+              const qEnd = arc ? arc.pts[aIsM ? 0 : arc.pts.length - 1] : null;
+              wall(a, b, aIsM, dir, v, L, q[j], side, m, style, br[i] && I.bs, top[i] && (I.tr || porch[i]), qEnd);
             } else if (br[j] && !br[i]) {
               // A walkway docks onto this block's floor: the full wall stands above its deck
               wall(a, b, aIsM, dir, v, L, q[j], wallColor, m, style, false, top[i] && (I.tr || porch[i]));
+            }
+          }
+          if (arc) {
+            const { pts, nrm } = arc, bands = aoBands(v, L), half = pts.length / 2;
+            for (let k = 0; k + 1 < pts.length; k++) {
+              const m = { kind: 'wall', v, L, target: q[k < half - 0.5 ? n : p] };
+              const h = [nrm[k][0] + nrm[k + 1][0], 0, nrm[k][1] + nrm[k + 1][1]];
+              face(pts[k], pts[k + 1], yBottom(L), yt, h, wallColor, m, ...bands);
+            }
+          }
+          // Where only one of two stacked floors has its corner rounded, a ledge closes the step
+          if (!top[i]) {
+            const up = cornerArc(i, L + 1);
+            if (up && !arc) {
+              fanOver(Q, yt, up.pts.map((pt) => [pt, yt]), [0, 1, 0], wallColor, topMeta);
+            } else if (arc && !up) {
+              const above = wallColorOf(infoOf(v, L + 1).info, L + 1);
+              fanOver(Q, yt, arc.pts.map((pt) => [pt, yt]), [0, -1, 0], above.clone().multiplyScalar(0.7), { kind: 'bottom', v, L: L + 1 });
             }
           }
         }
