@@ -223,3 +223,7 @@ the original Townscaper.
  - Plain HTML and CSS in index.html, so it shows at once: the app icon floating, the title and three
    hopping dots in palette colors.
  - It fades out once the first frame has been rendered (shaders compiled), then removes itself.
+- 2026-09-30: save a picture of the town (camera button or P).
+ - A clean frame without the grid, hover preview or UI, with a white flash and a soft shutter sound.
+ - Desktop downloads a PNG named by date and time; phones open the share sheet, so it can go
+   straight to Photos.

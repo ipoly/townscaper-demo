@@ -133,6 +133,9 @@
       padding: 8px 16px; border-radius: 999px; font-size: 13px;
       opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none;
     }
+    #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
+    #flash.flash { animation: flash 0.35s ease-out; }
+    @keyframes flash { from { opacity: 0.7; } to { opacity: 0; } }
     #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
     @media (max-width: 720px) {
@@ -231,7 +234,7 @@
       <dt><kbd>Z</kbd> / <kbd>⇧Z</kbd></dt><dd>Undo / redo</dd>
       <dt><kbd>R</kbd> <kbd>T</kbd></dt><dd>New island · showcase</dd>
       <dt><kbd>N</kbd> <kbd>G</kbd> <kbd>M</kbd></dt><dd>Time of day · grid · sound</dd>
-      <dt><kbd>S</kbd> <kbd>C</kbd></dt><dd>Share link · clear</dd>
+      <dt><kbd>P</kbd> <kbd>S</kbd> <kbd>C</kbd></dt><dd>Picture · share link · clear</dd>
       <dt><kbd>H</kbd></dt><dd>Toggle this help</dd>
     </dl>
   </aside>
@@ -268,6 +271,9 @@
       <svg viewBox="0 0 24 24" data-sound="off" hidden><path d="M11 5 6 9H2v6h4l5 4z" /><path d="m22 9-6 6M16 9l6 6" /></svg>
     </button>
     <span class="sep"></span>
+    <button id="btn-photo" class="icon-btn" aria-label="Save picture" data-tip="Save picture (P)">
+      <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+    </button>
     <button id="btn-share" class="icon-btn" aria-label="Share link" data-tip="Copy share link (S)">
       <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
     </button>
@@ -286,6 +292,7 @@
   </nav>
 
   <div id="toast" class="glass"></div>
+  <div id="flash"></div>
   <div id="palette" class="glass"></div>
   <script type="module" src="./main.js"></script>
 </body>

@@ -87,6 +87,26 @@ export class Sfx {
     osc.stop(t + 0.2);
   }
 
+  // Camera shutter: two short bursts of bandpassed noise, click then clack
+  shutter() {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.05), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    for (const [at, f, v] of [[0, 3200, 0.35], [0.07, 1800, 0.28]]) {
+      const src = ctx.createBufferSource(), band = ctx.createBiquadFilter(), gain = ctx.createGain();
+      src.buffer = buf;
+      band.type = 'bandpass';
+      band.frequency.value = f;
+      band.Q.value = 1.2;
+      gain.gain.setValueAtTime(v, t + at);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.045);
+      src.connect(band).connect(gain).connect(this.master);
+      src.start(t + at);
+    }
+  }
+
   // Brown noise through a lowpass, swelling slowly like waves
   startSurf() {
     const ctx = this.ctx;

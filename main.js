@@ -1078,6 +1078,38 @@ async function share() {
   }
 }
 
+// --- Screenshot ---
+// A clean frame without the grid and hover preview, read back in the same task as the render,
+// while the drawing buffer still holds it. Phones get the share sheet (save to Photos), others a download.
+const coarse = matchMedia('(hover: none) and (pointer: coarse)');
+function screenshot() {
+  const hidden = [gridLines, ghost].filter((o) => o && o.visible);
+  for (const o of hidden) o.visible = false;
+  renderer.render(scene, camera);
+  renderer.domElement.toBlob(async (blob) => {
+    if (!blob) return toast('Could not take a picture');
+    const d = new Date(), pad = (n) => String(n).padStart(2, '0');
+    const name = `town-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`;
+    const file = new File([blob], name, { type: 'image/png' });
+    if (coarse.matches && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); } catch {}
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('Picture saved');
+  }, 'image/png');
+  for (const o of hidden) o.visible = true;
+  sfx.shutter();
+  flashEl.classList.remove('flash');
+  void flashEl.offsetWidth; // restart the animation
+  flashEl.classList.add('flash');
+}
+const flashEl = document.getElementById('flash');
+
 // --- Input ---
 // Left click/drag: build on the level of the first block of the stroke; occupied cells stack upwards
 // Shift + left drag: remove on one level · Right click: remove · Right drag: orbit · Middle drag: pan
@@ -1374,6 +1406,7 @@ const buttons = {
   'btn-redo': redo,
   'btn-clear': clearTown,
   'btn-share': share,
+  'btn-photo': screenshot,
   'btn-sound': toggleMute,
   'btn-brush': () => setTouchTool('brush'),
   'btn-erase': () => setTouchTool('erase'),
@@ -1406,6 +1439,7 @@ addEventListener('keydown', (e) => {
   if (key === 'n') setMood((moodIndex + 1) % MOODS.length);
   if (key === 'm') toggleMute();
   if (key === 's') share();
+  if (key === 'p') screenshot();
 });
 
 addEventListener('resize', () => {
