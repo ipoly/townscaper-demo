@@ -252,7 +252,7 @@ function setMood(i, ease = 1.6) {
 }
 function updateMood(t) {
   if (!moodFrom) return false;
-  const k = Math.min(1, (t - moodStart) / moodEase);
+  const k = moodEase > 0 ? Math.min(1, (t - moodStart) / moodEase) : 1;
   const e = k * k * (3 - 2 * k);
   for (const key in look) {
     look[key] = typeof look[key] === 'number' ? THREE.MathUtils.lerp(moodFrom[key], moodTo[key], e) : look[key].copy(moodFrom[key]).lerp(moodTo[key], e);
@@ -1612,6 +1612,11 @@ addEventListener('resize', () => {
 });
 
 if (!loadFromHash()) newWorld(42, showcaseTown);
+// Open at the local time of day: dawn 5-8, day 8-17, dusk 17-20, night otherwise
+{
+  const h = new Date().getHours();
+  setMood(h >= 5 && h < 8 ? 3 : h >= 8 && h < 17 ? 0 : h >= 17 && h < 20 ? 1 : 2, 0);
+}
 // Ambient motion is slow, so after a few idle seconds 30fps looks the same and saves battery.
 // Any input or camera movement brings back the full frame rate immediately.
 const IDLE_AFTER = 3, IDLE_FRAME = 1 / 30;

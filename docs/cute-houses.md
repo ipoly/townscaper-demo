@@ -245,3 +245,5 @@ the original Townscaper.
    then a shower comes or clears up.
  - Any input brings the UI back; that first press (and any within 0.6 s of waking) does nothing
    else, so waking never builds a block.
+- 2026-09-30: the town opens at the local time of day (dawn 5-8, day 8-17, dusk 17-20, night
+  otherwise), set at once without a blend.
