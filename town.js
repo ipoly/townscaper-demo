@@ -1597,11 +1597,28 @@ export class Town {
         return;
       }
       // Ground floor facing a plaza, or any floor a walkway docks onto, gets a double door
+      // Wall lantern on a bracket beside a door; this half draws the one on its side
+      const lantern = (u, yl) => {
+        const w0 = at(tm(u), 0), w1 = at(tm(u), 0.07);
+        slab(u - U(0.012), u + U(0.012), 0.07, yl + 0.1, yl + 0.12, SLATE);
+        box(w1, yl, yl + 0.09, 0.03, dirAlong(), LAMP, m);
+        cone(w1, 0.05, yl + 0.09, yl + 0.14, 4, SLATE, m, Math.PI / 4);
+        box(w0, yl - 0.02, yl + 0.14, 0.018, dirAlong(), SLATE, m);
+      };
       if ((facesPlaza && h < 0.6) || (units.bridge.has(this.key(target, L)) && h < 0.75)) {
+        if (hash(v, target, 11) < 0.5) lantern(Math.min(0.9, 0.2 + 0.05 + U(0.08)), y0 + 0.36);
         const shaded = facesPlaza && hash(v, target, 8) < 0.55;
         door(0, 0.2, pickFrom(DOORS, hash(v, target, 3)), !shaded && hash(v, target, 10) < 0.6);
         if (shaded) awning(0.29, y0 + 0.66, y0 + 0.54, 0.2, pickFrom(UMBRELLAS.slice(0, 3), hash(v, target, 9)));
         return;
+      }
+      // Bushes at the foot of walls that face a lawn or a square
+      if (facesPlaza && infoOf(target, 0).info.gt !== 'dock' && hash(v, target, 12) < 0.45) {
+        const leaf = pickFrom(LEAVES, hash(v, target, 13));
+        for (const [x, r] of [[0.28, 0.085], [0.4, 0.06]]) {
+          const pos = at(tm(Math.min(0.9, U(x))), 0.08);
+          blob([pos[0], y0 + r * 0.7, pos[1]], r, 0.9, leaf, m);
+        }
       }
       if (h < 0.1) return; // blank wall
       if (h < 0.42) {
@@ -1835,6 +1852,11 @@ export class Town {
             }
 
             if (firstQuad && I.lt) lighthouseTop(C[i], hC, topMeta);
+            // Gold ball on a stem crowning a lone pointed roof
+            if (firstQuad && eaved[i] && !allHigh && this.grid.neighbors[v].every((u) => !this.has(u, L))) {
+              box(C[i], hC - 0.02, hC + 0.07, 0.012, [1, 0], SLATE, topMeta);
+              blob([C[i][0], hC + 0.1, C[i][1]], 0.04, 1, GOLD, topMeta);
+            }
             const isRow = I.ut === 'row';
             const dormerQuad = this.vertexQuads[v][Math.floor(this.vertexQuads[v].length / 2)];
             if (isRow && !allHigh && q === dormerQuad && hash(v, L, 41) < 0.8) {

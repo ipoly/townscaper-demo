@@ -44,6 +44,12 @@ the original Townscaper.
 - [x] Chunky chimneys with a cap
 - [x] Arched double doors
 
+### Phase 5: street props
+
+- [x] Wall lanterns beside some double doors (glow at night)
+- [x] Small bushes at the foot of plaza-facing walls
+- [x] Gold finials on the apex of lone pointed roofs
+
 ## Progress log
 
 - 2026-09-30: diagnosis done; starting phase 1 items 1-3.
@@ -87,3 +93,10 @@ the original Townscaper.
    smoke starts at the cap.
  - Doors: about 60% of the double doors without an awning get a half-round fanlight over both wings.
  - Known leftovers: hip caps kink slightly where they cross from the roof onto the eave.
+- 2026-09-30: phase 5 done.
+ - Lanterns: `lantern()` hangs a slate-framed `LAMP` box on a bracket beside ~50% of the double doors,
+   clear of the awning; it glows with the other lamps at night.
+ - Bushes: ~45% of the plaza-facing ground-floor walls without a door get two leaf blobs at their foot
+   (not on docks).
+ - Finials: a pointed roof whose column has no neighbours at that level gets a slate stem and a gold
+   knob at the apex.
