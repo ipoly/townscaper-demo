@@ -119,6 +119,46 @@ export function roofParts(ctx) {
     finial(c2, y + 0.4, m);
   };
 
+  // Horse-head wall between two row houses: a whitewashed wall standing up through the roof along
+  // their shared wall, from the ridge at M out past the eave beyond Q, in steps that follow the
+  // slope down, each under a dark tile cap whose outer end sweeps up like a horse's head. The houses on either side
+  // of M each build their half. peak and low: roof heights at M and Q
+  const FIRE_STEPS = 3, FIRE_ABOVE = 0.14, FIRE_HALF = 0.035;
+  const firewall = (Mi, Q, peak, low, m) => {
+    const { wall, cap } = kit.firewalls;
+    const len = Math.hypot(Q[0] - Mi[0], Q[1] - Mi[1]) || 1, d = [(Q[0] - Mi[0]) / len, (Q[1] - Mi[1]) / len];
+    const nrm = [-d[1], d[0]], total = len + EV;
+    const roofAt = (s) => (s <= len ? peak + ((low - peak) * s) / len : low - (DROP * (s - len)) / EV);
+    // Block along the wall from s0 to s1, half as thick as half, between heights y0 and y1
+    const block = (s0, s1, half, y0, y1, color) => {
+      const P = (s, w) => [Mi[0] + d[0] * s + nrm[0] * w, Mi[1] + d[1] * s + nrm[1] * w];
+      const a0 = P(s0, -half), a1 = P(s1, -half), b0 = P(s0, half), b1 = P(s1, half);
+      quad(p3(a0, y0), p3(a1, y0), p3(a1, y1), p3(a0, y1), [-nrm[0], 0, -nrm[1]], color, m);
+      quad(p3(b0, y0), p3(b1, y0), p3(b1, y1), p3(b0, y1), [nrm[0], 0, nrm[1]], color, m);
+      quad(p3(a0, y1), p3(a1, y1), p3(b1, y1), p3(b0, y1), [0, 1, 0], color, m);
+      quad(p3(a1, y0), p3(b1, y0), p3(b1, y1), p3(a1, y1), [d[0], 0, d[1]], color, m);
+    };
+    // The head: the cap's end tilted up, from s back along the wall to s + 0.04 out past it
+    const head = (s, y) => {
+      const w = FIRE_HALF + 0.025, P = (t, k) => [Mi[0] + d[0] * t + nrm[0] * k, Mi[1] + d[1] * t + nrm[1] * k];
+      const a0 = p3(P(s - 0.09, -w), y), b0 = p3(P(s - 0.09, w), y);
+      const a1 = p3(P(s + 0.04, -w), y + 0.06), b1 = p3(P(s + 0.04, w), y + 0.06);
+      const a2 = p3(P(s + 0.04, -w), y), b2 = p3(P(s + 0.04, w), y);
+      quad(a0, a1, b1, b0, [0, 1, 0], cap, m);
+      quad(a2, b2, b1, a1, [d[0], 0, d[1]], cap, m);
+      tri(a0, a2, a1, [-nrm[0], 0, -nrm[1]], cap, m);
+      tri(b0, b2, b1, [nrm[0], 0, nrm[1]], cap, m);
+    };
+    const yb = low - DROP - 0.08;
+    for (let k = 0; k < FIRE_STEPS; k++) {
+      const s0 = (total * k) / FIRE_STEPS, s1 = (total * (k + 1)) / FIRE_STEPS;
+      const top = roofAt(s0) + FIRE_ABOVE;
+      block(s0, s1, FIRE_HALF, yb, top, wall);
+      block(s0, s1 - 0.09, FIRE_HALF + 0.025, top, top + 0.03, cap);
+      head(s1, top);
+    }
+  };
+
   // Dormer on a roof slope at c2 whose roof height is y, facing dir
   const dormer = (c2, y, dir, color, m) => {
     box(c2, y - 0.12, y + 0.16, 0.09, dir, color, m);
@@ -163,5 +203,5 @@ export function roofParts(ctx) {
     }
   };
 
-  return { eaves, finial, pagodaSkirt, pagodaSpire, dormer, canopy };
+  return { eaves, finial, pagodaSkirt, pagodaSpire, firewall, dormer, canopy };
 }

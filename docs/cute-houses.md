@@ -347,3 +347,8 @@ step keeps the geometry byte for byte the same.
   tip. The top gets a flared pointed roof and a mast of gold rings under a gourd, and no lamp
   beam. Row houses drop their dormers in the chinese style (`dormers`). Horse-head gable walls
   are still an option for later.
+- 2026-09-30: stage 4, horse-head walls. Where two row houses of the same roof height meet, the
+  chinese style (`firewalls`) raises a whitewashed wall along the shared edge that climbs above
+  the roof in three steps, each capped with dark tiles ending in an upturned wedge. Chimneys
+  (`chimney`) become slim plastered stacks under a small four-sided tiled hat instead of chunky
+  brick ones, with the smoke rising from under the hat. The european style is unchanged.

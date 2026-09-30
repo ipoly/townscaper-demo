@@ -8,7 +8,9 @@
 //   granite arch bridges · eaves: null for straight eaves, or { out, drop, lift } for flared ones
 //   whose outer corners turn up by lift · squareCorners: no rounded house corners ·
 //   spireRise: height of a lone tower's pointed roof · finial: 'ball' or 'gourd' on pointed roofs ·
-//   dormers: dormer windows on row house roofs · tower: the tall tower by the water, its walls
+//   dormers: dormer windows on row house roofs · firewalls: null, or { wall, cap } colors for
+//   stepped horse-head walls between row houses · chimney: null for brick stacks, or { stack, cap }
+//   colors for plastered ones under a tiled hat · tower: the tall tower by the water, its walls
 //   by floor parity, and either a 'lamp' room on a flat top or a 'pagoda' with a skirt roof of
 //   color roof on every floor and a pointed top rising by rise
 import * as THREE from 'three';
@@ -38,5 +40,7 @@ export default {
   spireRise: SPIRE_RISE,
   finial: 'ball',
   dormers: true,
+  firewalls: null,
+  chimney: null,
   tower: { walls: [LH_RED, WHITE], top: 'lamp', roof: null, rise: 0 },
 };

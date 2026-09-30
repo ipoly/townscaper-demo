@@ -760,7 +760,7 @@ export class Town {
     const stoneSpan = (I, L) => kit.stoneBridges && L === 1 && I.br && I.bs === 'w';
     const ctx = { E, tri, quad, blob, box, prism, cone, bar: E.bar, ridgeCap, sagString, hanging, town: this, kit, verts, units, infoOf, stoneSpan };
     for (const make of [propParts, landmarkParts, roofParts, carryParts, wallParts]) Object.assign(ctx, make(ctx));
-    const { fountain, tree, fence, plants, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, finial, pagodaSkirt, pagodaSpire, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
+    const { fountain, tree, fence, plants, lanternString, streetString, plazaProp, terraceProps, duck, lilyPad, landmark, lighthouseTop, eaves, finial, pagodaSkirt, pagodaSpire, firewall, dormer, canopy, posts, brackets, joists, tieRods, underside, seams, face, aoBands, wall } = ctx;
 
     const emitQuad = (q) => {
       const C = q.map((v) => verts[v]);
@@ -977,6 +977,10 @@ export class Town {
               }
             }
 
+            // Horse-head wall where the ridge runs on into the next house of a row
+            if (kit.firewalls && I.ut === 'row' && inf[n]?.ut === 'row' && eaved[i] && eaved[n] && !allHigh && inf[n].r === rise) {
+              firewall(M[i], Q, hC, hQ, topMeta);
+            }
             if (firstQuad && I.lt) (kit.tower.top === 'pagoda' ? pagodaSpire : lighthouseTop)(C[i], hC, topMeta);
             // Gold ball on a stem crowning a lone pointed roof
             else if (firstQuad && eaved[i] && !allHigh && this.grid.neighbors[v].every((u) => !this.has(u, L))) finial(C[i], hC, topMeta);
@@ -1003,20 +1007,29 @@ export class Town {
               const pos = lerp2(C[i], Q, 0.5);
               const dir = [M[i][0] - C[i][0], M[i][1] - C[i][1]];
               const dl = Math.hypot(dir[0], dir[1]) || 1;
-              // Chunky stack in the wall color (brick on pale houses) with a white cap and dark flue
               const d = [dir[0] / dl, dir[1] / dl], yc = hC + 0.06;
-              box(pos, (hC + hQ) / 2 - 0.1, yc, 0.095, d, wallColor.r + wallColor.g + wallColor.b > 2.6 ? BRICK : wallColor, topMeta);
-              box(pos, yc, yc + 0.05, 0.12, d, WHITE, topMeta);
-              E.noOutline = true;
-              box(pos, yc + 0.05, yc + 0.052, 0.065, d, SHADOW, topMeta);
-              E.noOutline = false;
+              let puff = yc + 0.05;
+              if (kit.chimney) {
+                // Slim plastered stack under a little tiled hat
+                box(pos, (hC + hQ) / 2 - 0.1, yc, 0.07, d, kit.chimney.stack, topMeta);
+                box(pos, yc, yc + 0.03, 0.085, d, kit.chimney.cap, topMeta);
+                cone(pos, 0.13, yc + 0.03, yc + 0.13, 4, kit.chimney.cap, topMeta, Math.atan2(d[1], d[0]) + Math.PI / 4);
+                puff = yc + 0.1;
+              } else {
+                // Chunky stack in the wall color (brick on pale houses) with a white cap and dark flue
+                box(pos, (hC + hQ) / 2 - 0.1, yc, 0.095, d, wallColor.r + wallColor.g + wallColor.b > 2.6 ? BRICK : wallColor, topMeta);
+                box(pos, yc, yc + 0.05, 0.12, d, WHITE, topMeta);
+                E.noOutline = true;
+                box(pos, yc + 0.05, yc + 0.052, 0.065, d, SHADOW, topMeta);
+                E.noOutline = false;
+              }
               // wake: the earliest switch-on order among the house's floors; half the early risers cook breakfast
               let wake = 0;
               for (let l = 0; l <= L; l++) {
                 const o = this.has(v, l) ? infoOf(v, l).info.lit : 0;
                 if (o > 0 && (!wake || o < wake)) wake = o;
               }
-              E.R.fx.smoke.push({ x: pos[0], y: yc + 0.05, z: pos[1], born: I.b, seed: hash(v, L, 4), wake, breakfast: hash(v, L, 5) < 0.5 });
+              E.R.fx.smoke.push({ x: pos[0], y: puff, z: pos[1], born: I.b, seed: hash(v, L, 4), wake, breakfast: hash(v, L, 5) < 0.5 });
             }
           }
 

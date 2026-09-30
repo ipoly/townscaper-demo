@@ -30,5 +30,7 @@ export default {
   spireRise: 0.8,
   finial: 'gourd',
   dormers: false,
+  chimney: { stack: new THREE.Color('#e6e1d6'), cap: new THREE.Color('#44494c') },
+  firewalls: { wall: new THREE.Color('#f1efe9'), cap: new THREE.Color('#44494c') },
   tower: { walls: [tower, tower], top: 'pagoda', roof: new THREE.Color('#4f5558'), rise: 0.7 },
 };
