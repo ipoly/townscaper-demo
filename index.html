@@ -111,7 +111,7 @@
     }
     .swatch {
       position: relative; width: 26px; height: 26px; padding: 0; border-radius: 50%; cursor: pointer;
-      border: 2px solid rgba(0, 0, 0, 0.12); transition: transform 0.15s, box-shadow 0.15s;
+      border: 2px solid rgba(0, 0, 0, 0.12); background-origin: border-box; transition: transform 0.15s, box-shadow 0.15s;
     }
     .swatch:hover { transform: scale(1.12); }
     .swatch.active { transform: scale(1.15); box-shadow: 0 0 0 2px var(--glass), 0 0 0 4px var(--ink); }

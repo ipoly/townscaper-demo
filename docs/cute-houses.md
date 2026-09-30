@@ -169,3 +169,12 @@ the original Townscaper.
  - Colors that do not fit sRGB lose chroma only; lightness and hue are kept exactly.
  - Closest pair: deltaE 11.2 (walls) / 10.0 (roofs), OKLab x100. Old share links open with different
    colors.
+- 2026-09-30: palette swatches show the pair as it looks in the scene.
+ - The raw hex swatches looked much brighter than the walls: the warm sun, the blue-grey ground light
+   and ACES tone mapping darken and mute every surface. `litColors()` in `main.js` renders each color
+   once at startup through the town material and daytime lights, on a wall and on a 45 degree roof
+   facing the sun, and reads the pixels back.
+ - Each swatch shows the lit roof color on top and the lit wall color below, since a choice sets
+   both and the roof is the more visible. (A sunlit-to-shade gradient of the wall alone was tried
+   first; it read darker than the walls and looked like a roof color.)
+ - Swatches keep the daytime look at dusk and night.

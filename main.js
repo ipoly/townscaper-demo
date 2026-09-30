@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { generateGrid, mulberry32 } from './grid.js';
-import { Town, MAX_LEVEL, PALETTE, levelPlaneY } from './town.js';
+import { Town, MAX_LEVEL, PALETTE, ROOF_OF, levelPlaneY } from './town.js';
 import { Sfx } from './audio.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -907,10 +907,43 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 // --- Color palette: "auto" inherits from the block below, otherwise paints new blocks ---
 let selectedColor = null;
 const paletteEl = document.getElementById('palette');
+// Swatches show each color pair as it looks in the daytime sun, roof over wall: rendered once
+// through the town's material, lights and tone mapping, and read back before the next frame.
+// `up` tilts the surface towards the sky (0 for a wall, 1 for a 45 degree roof)
+function litColors(colors, up) {
+  const day = MOODS[0], s = new THREE.Scene();
+  s.add(new THREE.HemisphereLight(day.sky, day.ground, day.hemi));
+  const light = new THREE.DirectionalLight(day.sun, day.sunI);
+  light.position.fromArray(day.sunPos);
+  s.add(light);
+  const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  cam.position.set(14, 16, 18).setLength(6);
+  cam.lookAt(0, 0, 0);
+  const geo = new THREE.PlaneGeometry(4, 4), attr = new THREE.Float32BufferAttribute(new Float32Array(12), 3);
+  geo.setAttribute('color', attr);
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
+  const mesh = new THREE.Mesh(geo, mat);
+  s.add(mesh);
+  const gl = renderer.getContext(), px = new Uint8Array(4), size = renderer.getDrawingBufferSize(new THREE.Vector2());
+  mesh.lookAt(day.sunPos[0], up * Math.hypot(day.sunPos[0], day.sunPos[2]), day.sunPos[2]);
+  const out = colors.map((hex) => {
+    const c = new THREE.Color(hex);
+    for (let i = 0; i < 4; i++) attr.setXYZ(i, c.r, c.g, c.b);
+    attr.needsUpdate = true;
+    renderer.render(s, cam);
+    gl.readPixels(size.x >> 1, size.y >> 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return `rgb(${px[0]}, ${px[1]}, ${px[2]})`;
+  });
+  geo.dispose();
+  mat.dispose();
+  return out;
+}
+const LIT = litColors(PALETTE, 0), LIT_ROOF = litColors(ROOF_OF, 1);
 const swatches = [null, ...PALETTE.map((_, i) => i)].map((idx, n) => {
   const el = document.createElement('button');
   el.className = 'swatch' + (idx === null ? ' auto' : '');
-  if (idx !== null) el.style.background = PALETTE[idx];
+  if (idx !== null) el.style.backgroundImage = `linear-gradient(${LIT_ROOF[idx]} 45%, ${LIT[idx]} 45%)`;
+  else el.style.background = `conic-gradient(${[1, 2, 3, 4, 5, 8, 7, 6, 1].map((i) => LIT[i]).join(', ')})`;
   el.dataset.tip = idx === null ? 'Auto color (0)' : `Color ${n} (${n})`;
   el.setAttribute('aria-label', idx === null ? 'Auto color' : `Color ${n}`);
   el.onclick = () => selectColor(idx);
