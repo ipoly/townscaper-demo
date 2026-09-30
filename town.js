@@ -1885,8 +1885,8 @@ export class Town {
         noOutline = true;
         quad(p3(C[i], POND_Y), p3(M[i], POND_Y), p3(Q, POND_Y), p3(M[p], POND_Y), [0, 1, 0], POND_COLORS[P.type], pm);
         noOutline = false;
-        // Fireflies gather over most of the pond water at night
-        if (hash(v, quadId, 81) < 0.8) {
+        // Now and then a firefly spot over the pond water at night
+        if (hash(v, quadId, 81) < 0.4) {
           const f = lerp2(C[i], Q, 0.5);
           R.fx.flies.push({ x: f[0], y: POND_Y, z: f[1], born: P.b });
         }

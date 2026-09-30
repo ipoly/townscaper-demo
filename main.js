@@ -368,19 +368,24 @@ function syncRays() {
 }
 
 // --- Fireflies: small blinking points wandering over the ponds at night ---
-const FLIES_PER_SPOT = 3;
+const FLIES_PER_SPOT = 1;
 const fireflyMaterial = new THREE.ShaderMaterial({
   uniforms: { uTime, uNight, uScale: glowMaterial.uniforms.uScale },
   vertexShader: `attribute float aBorn; attribute vec3 aSeed;
 uniform float uTime, uNight, uScale;
 varying float vFade;
 void main() {
+  // Each fly lives for about a third of its cycle, then fades away and comes back somewhere nearby
+  float period = mix(9.0, 16.0, aSeed.x), phase = uTime / period + aSeed.y;
+  float cycle = floor(phase), age = fract(phase);
+  float life = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.25, 0.38, age));
+  vec2 hop = fract(sin(vec2(cycle * 12.99 + aSeed.z * 78.23, cycle * 39.35 + aSeed.x * 11.13)) * 43758.55) - 0.5;
   float t = uTime * (0.5 + 0.4 * aSeed.x) + aSeed.y * 6.28;
-  vec3 p = position + vec3(sin(t * 1.3) * 0.28, 0.12 + 0.3 * (0.5 + 0.5 * sin(t * 0.7 + aSeed.z * 6.28)), cos(t * 1.1 + aSeed.z * 3.0) * 0.28);
+  vec3 p = position + vec3(hop.x * 0.5, 0.0, hop.y * 0.5) + vec3(sin(t * 1.3) * 0.28, 0.12 + 0.3 * (0.5 + 0.5 * sin(t * 0.7 + aSeed.z * 6.28)), cos(t * 1.1 + aSeed.z * 3.0) * 0.28);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_PointSize = 0.24 * uScale * projectionMatrix[1][1] / -mv.z;
   float blink = pow(0.5 + 0.5 * sin(uTime * (1.2 + aSeed.z) + aSeed.x * 20.0), 3.0);
-  vFade = smoothstep(0.55, 0.95, uNight) * smoothstep(aBorn + 0.6, aBorn + 1.4, uTime) * (0.15 + 0.85 * blink);
+  vFade = smoothstep(0.55, 0.95, uNight) * smoothstep(aBorn + 0.6, aBorn + 1.4, uTime) * life * (0.15 + 0.85 * blink);
   gl_Position = projectionMatrix * mv;
 }`,
   fragmentShader: `varying float vFade;

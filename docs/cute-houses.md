@@ -204,5 +204,6 @@ the original Townscaper.
 - 2026-09-30: dawn light shafts and pond fireflies.
  - Dawn: nine long soft strips slant in from the sun over the town's footprint, turned to face the
    camera around their own axis and slowly shimmering. Buildings in front still hide them.
- - Night: fireflies wander and blink over most pond water, three per spot, fading in with the night.
+ - Night: a few fireflies over pond water, each glowing for about a third of a 9-16 s cycle and then
+   fading away to come back somewhere nearby.
  - Both are a single draw each, animated in the vertex shader, with no full-screen pass.
