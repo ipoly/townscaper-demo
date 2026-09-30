@@ -244,7 +244,7 @@ the original Townscaper.
    town once every two minutes, the time of day moves on every 25 s with slower blends, and now and
    then a shower comes or clears up.
  - Any input brings the UI back; that first press (and any within 0.6 s of waking) does nothing
-   else, so waking never builds a block.
+   else, so waking never builds a block. (Later: only a press, wheel or key wakes it, see below.)
 - 2026-09-30: the town opens at the local time of day (dawn 5-8, day 8-17, dusk 17-20, night
   otherwise), set at once without a blend.
 - 2026-09-30: the splash and icons follow the town.
@@ -256,3 +256,11 @@ the original Townscaper.
    houses into the safe zone.
  - New small favicon: one house on stilts with a big window, readable at 16 px. The tab icon is
    recolored with the time of day, its window lit at dusk and night.
+- 2026-09-30: a gentler first visit.
+ - Without a town in the link the page opens on a tiny starter scene instead of the showcase: a
+   lily pond ringed by garden, a cottage on its bank and a lighthouse across the water, seen up
+   close.
+ - Every visit, shared links included, opens in orbit mode. Moving the mouse lets it keep
+   circling (and hides the hover highlight); a press, wheel or key wakes it, and that input does
+   nothing else. The cursor stays visible while orbiting.
+ - The help panel starts closed unless it was left open last time.

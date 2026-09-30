@@ -135,7 +135,6 @@
     }
     /* Orbit mode: only the town */
     body.orbit :is(#tools, #palette, #help, #help-open, #modes, #toast) { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.8s !important; }
-    body.orbit canvas { cursor: none; }
     #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
     #flash.flash { animation: flash 0.35s ease-out; }
     @keyframes flash { from { opacity: 0.7; } to { opacity: 0; } }

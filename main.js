@@ -845,6 +845,35 @@ function seedTown(seed) {
   }
 }
 
+// The first town a visitor sees: a lily pond ringed by garden, a cottage on its bank and a
+// lighthouse just off it, the smallest set that shows water, a house and a landmark
+const VIEW = [14 / Math.hypot(14, 18), 18 / Math.hypot(14, 18)]; // the opening camera's direction on the ground
+function starterTown() {
+  const free = (v) => !grid.fixed[v];
+  const byDistance = grid.verts.map((p, v) => v).filter(free).sort((a, b) => Math.hypot(...grid.verts[a]) - Math.hypot(...grid.verts[b]));
+  const t0 = now() + 0.3;
+  const put = (v, L0, L1, delay) => { for (let L = L0; L <= L1; L++) town.add(v, L, t0 + delay + L * 0.18); };
+  for (const pond of byDistance) {
+    const bank = grid.neighbors[pond];
+    if (!bank.every(free)) continue;
+    // The cottage sits off to one side of the opening view, not between the camera and the water
+    const [px, pz] = grid.verts[pond];
+    const toward = (v) => ((grid.verts[v][0] - px) * VIEW[0] + (grid.verts[v][1] - pz) * VIEW[1]);
+    const aside = (v) => Math.abs((grid.verts[v][0] - px) * VIEW[1] - (grid.verts[v][1] - pz) * VIEW[0]);
+    const cottage = bank.reduce((a, b) => (aside(b) - toward(b) * 0.3 > aside(a) - toward(a) * 0.3 ? b : a));
+    // The lighthouse stands apart across the pond from the cottage, so the two read as two buildings
+    const apart = (v) => Math.hypot(grid.verts[v][0] - grid.verts[cottage][0], grid.verts[v][1] - grid.verts[cottage][1]);
+    const tower = bank.flatMap((b) => grid.neighbors[b])
+      .filter((v) => free(v) && v !== pond && !bank.includes(v) && !grid.neighbors[v].includes(cottage) && grid.neighbors[v].filter((u) => free(u) && !bank.includes(u)).length >= 2)
+      .sort((a, b) => apart(b) - apart(a))[0];
+    if (tower === undefined || Math.hypot(grid.verts[tower][0] - px, grid.verts[tower][1] - pz) < 1) continue;
+    bank.forEach((v, i) => put(v, 0, 0, i * 0.08));
+    put(cottage, 1, 2, 0.4);
+    put(tower, 0, 4, 0.7);
+    return;
+  }
+}
+
 // One of each kind of structure, for checking how blocks are carried: overhangs, arches,
 // blocks on posts at every height, long walkways. Each piece gets a clear patch of its own.
 const SHOWCASE = [
@@ -1243,7 +1272,7 @@ function screenshot() {
 const flashEl = document.getElementById('flash');
 
 // --- Orbit mode: after a while without input (or with O) the UI steps aside, the camera circles
-// the town and the time of day and weather move on by themselves. Any input brings it back ---
+// the town and the time of day and weather move on by themselves. A press or key brings it back ---
 const ORBIT_AFTER = 30, ORBIT_STEP = 25; // idle seconds before it starts, seconds per time of day
 let orbiting = false, lastInput = now(), orbitNext = 0, gridWasOn = true, swallowUp = false;
 function setOrbit(on) {
@@ -1272,17 +1301,13 @@ function updateOrbit(t) {
   // Now and then the weather turns; showers clear up more readily than they start
   if (Math.random() < (raining ? 0.5 : 0.25)) setRain(!raining, 6);
 }
-// The input that wakes the town only wakes it: no block, no zoom, no shortcut. A mouse wakes it by
-// moving, so presses right after waking are held back too
-let wokeAt = -Infinity;
+// A press, wheel or key wakes the town and only wakes it: no block, no zoom, no shortcut. Just moving
+// the mouse lets it keep circling, though it still counts as being around
 for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
   addEventListener(type, (e) => {
     lastInput = now();
-    if (orbiting) {
-      setOrbit(false);
-      wokeAt = lastInput;
-    } else if (lastInput - wokeAt > 0.6) return;
-    if (type === 'pointermove') return;
+    if (!orbiting || type === 'pointermove') return;
+    setOrbit(false);
     e.stopPropagation();
     if (type === 'pointerdown') swallowUp = true;
   }, { capture: true });
@@ -1581,7 +1606,7 @@ function setHelp(open) {
   helpOpenEl.classList.toggle('hidden', open);
   try { localStorage.setItem('ts-help', open ? '1' : '0'); } catch {}
 }
-setHelp((() => { try { return localStorage.getItem('ts-help') !== '0'; } catch { return true; } })());
+setHelp((() => { try { return localStorage.getItem('ts-help') === '1'; } catch { return false; } })());
 
 const buttons = {
   'btn-new': randomIsland,
@@ -1638,7 +1663,17 @@ addEventListener('resize', () => {
   glowScale();
 });
 
-if (!loadFromHash()) newWorld(42, showcaseTown);
+// Without a town in the link (a first visit) open on the starter scene up close
+if (!loadFromHash()) {
+  newWorld(42, starterTown);
+  let cx = 0, cz = 0;
+  for (const k of town.cells) { const p = grid.verts[Math.floor(k / 64)]; cx += p[0] / town.cells.size; cz += p[1] / town.cells.size; }
+  const offset = camera.position.clone().multiplyScalar(0.42);
+  controls.target.set(cx, 1.2, cz);
+  camera.position.copy(controls.target).add(offset);
+}
+// Every visit opens circling slowly, like a postcard, until the first touch
+setOrbit(true);
 // Open at the local time of day, picked by the inline script in index.html
 setMood(Math.max(0, MOODS.findIndex((m) => m.name === document.documentElement.dataset.mood)), 0);
 // Ambient motion is slow, so after a few idle seconds 30fps looks the same and saves battery.
@@ -1667,7 +1702,7 @@ renderer.setAnimationLoop(() => {
   // Hover raycast only after pointer/camera/town changes, hidden while dragging
   if (hoverDirty) {
     hoverDirty = false;
-    if (lastMove && lastMove[2] === 0 && !stroke) setHover(buildTarget(pick(lastMove[0], lastMove[1])));
+    if (lastMove && lastMove[2] === 0 && !stroke && !orbiting) setHover(buildTarget(pick(lastMove[0], lastMove[1])));
     else setHover(null);
   }
   if (ghost) ghostMaterial.opacity = 0.35 + 0.15 * Math.sin(t * 6);
@@ -1707,5 +1742,5 @@ if ('serviceWorker' in navigator) {
 
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
-  undo, redo, setMood, setRain, setOrbit, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
+  undo, redo, setMood, setRain, setOrbit, starter: () => newWorld(42, starterTown), encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
 };
