@@ -1,22 +1,65 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4ecf1"/><stop offset="1" stop-color="#86c0cf"/></linearGradient></defs>
-  <rect width="512" height="512" rx="112" fill="url(#sea)"/>
-  <g>
-    <ellipse cx="256" cy="404" rx="176" ry="30" fill="#5e9fb2" opacity="0.55"/>
-    <rect x="96" y="372" width="320" height="36" rx="18" fill="#efe2c4"/>
-    <!-- left house -->
-    <rect x="120" y="248" width="120" height="132" fill="#f4d58f"/>
-    <path d="M106 256 L180 172 L254 256 Z" fill="#e2573f"/>
-    <rect x="144" y="282" width="24" height="34" rx="4" fill="#2c3446"/>
-    <rect x="192" y="282" width="24" height="34" rx="4" fill="#2c3446"/>
-    <rect x="166" y="336" width="28" height="44" rx="14" fill="#8a4b32"/>
-    <!-- right house -->
-    <rect x="236" y="184" width="148" height="196" fill="#7cc7b5"/>
-    <rect x="352" y="112" width="22" height="50" fill="#b8563f"/>
-    <path d="M222 192 L310 96 L398 192 Z" fill="#d9442f"/>
-    <rect x="262" y="214" width="26" height="36" rx="4" fill="#2c3446"/>
-    <rect x="332" y="214" width="26" height="36" rx="4" fill="#2c3446"/>
-    <rect x="262" y="280" width="26" height="36" rx="4" fill="#2c3446"/>
-    <rect x="332" y="280" width="26" height="36" rx="4" fill="#2c3446"/>
-    <rect x="296" y="336" width="28" height="44" rx="14" fill="#8a4b32"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dff1f4"/>
+      <stop offset="1" stop-color="#8fcad8"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6d8196"/>
+      <stop offset="1" stop-color="#34424f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <!-- island -->
+  <ellipse cx="256" cy="430" rx="200" ry="30" fill="#f7f4ee" opacity="0.7"/>
+  <rect x="58" y="392" width="396" height="44" rx="22" fill="#b8a58a"/>
+  <rect x="58" y="384" width="396" height="30" rx="15" fill="#dccfb4"/>
+  <!-- bunting across the street -->
+  <path d="M214 250 Q256 282 298 238" fill="none" stroke="#f7f4ee" stroke-width="4"/>
+  <path d="M224 257 l12 5 l-8 16 Z" fill="#e2574c"/>
+  <path d="M244 265 l13 1 l-5 17 Z" fill="#3f7fb5"/>
+  <path d="M265 264 l13 -3 l-2 18 Z" fill="#f2c14e"/>
+  <path d="M285 254 l11 -7 l1 18 Z" fill="#e2574c"/>
+  <!-- left house: teal, slate roof -->
+  <rect x="80" y="236" width="140" height="156" rx="20" fill="#89d6ce"/>
+  <path d="M150 128 L236 238 L64 238 Z" fill="#5a6f90" stroke="#5a6f90" stroke-width="14" stroke-linejoin="round"/>
+  <rect x="56" y="232" width="188" height="20" rx="10" fill="#4a5c78"/>
+  <circle cx="150" cy="280" r="23" fill="#f7f4ee"/>
+  <circle cx="150" cy="280" r="14" fill="url(#glass)"/>
+  <!-- awning over the door -->
+  <path d="M112 318 L188 318 L198 342 L102 342 Z" fill="#e2574c"/>
+  <path d="M127 318 L142 318 L140 342 L121 342 Z M158 318 L173 318 L179 342 L160 342 Z" fill="#f7f4ee"/>
+  <path d="M120 392 L120 364 A30 30 0 0 1 180 364 L180 392 Z" fill="#f7f4ee"/>
+  <path d="M130 392 L130 366 A20 20 0 0 1 170 366 L170 392 Z" fill="#7a3b3b"/>
+  <rect x="148" y="350" width="4" height="42" fill="#f7f4ee"/>
+  <!-- door pot -->
+  <path d="M190 376 L208 376 L205 392 L193 392 Z" fill="#b8643f"/>
+  <circle cx="199" cy="366" r="13" fill="#6fa35a"/>
+  <circle cx="194" cy="361" r="4" fill="#f2a7c3"/>
+  <circle cx="205" cy="368" r="4" fill="#f2a7c3"/>
+  <!-- right house: warm sand, red roof -->
+  <rect x="292" y="176" width="144" height="216" rx="20" fill="#fadaaa"/>
+  <circle cx="420" cy="60" r="14" fill="#f7f4ee" opacity="0.9"/>
+  <circle cx="440" cy="36" r="10" fill="#f7f4ee" opacity="0.75"/>
+  <path d="M364 64 L452 178 L276 178 Z" fill="#d35339" stroke="#d35339" stroke-width="14" stroke-linejoin="round"/>
+  <rect x="268" y="172" width="192" height="20" rx="10" fill="#b0402a"/>
+  <rect x="398" y="94" width="28" height="44" fill="#f3a172"/>
+  <rect x="392" y="84" width="40" height="14" rx="5" fill="#f7f4ee"/>
+  <rect x="362" y="34" width="4" height="24" fill="#3c4450"/>
+  <circle cx="364" cy="30" r="8" fill="#e0b84a"/>
+  <!-- arched window with curtains -->
+  <path d="M334 272 L334 234 A30 30 0 0 1 394 234 L394 272 Z" fill="#f7f4ee"/>
+  <path d="M344 264 L344 236 A20 20 0 0 1 384 236 L384 264 Z" fill="url(#glass)"/>
+  <path d="M344 236 A20 20 0 0 1 352 220 L352 264 L344 264 Z" fill="#f2a7c3"/>
+  <path d="M384 236 A20 20 0 0 0 376 220 L376 264 L384 264 Z" fill="#f2a7c3"/>
+  <rect x="328" y="268" width="72" height="10" rx="4" fill="#f7f4ee"/>
+  <!-- big window with a flower box -->
+  <rect x="334" y="300" width="60" height="54" rx="6" fill="#f7f4ee"/>
+  <rect x="344" y="310" width="40" height="36" rx="3" fill="url(#glass)"/>
+  <rect x="330" y="354" width="68" height="16" rx="4" fill="#b8643f"/>
+  <circle cx="344" cy="352" r="8" fill="#7fb865"/>
+  <circle cx="364" cy="350" r="8" fill="#6fa35a"/>
+  <circle cx="384" cy="352" r="8" fill="#7fb865"/>
+  <circle cx="354" cy="346" r="4" fill="#e2574c"/>
+  <circle cx="376" cy="345" r="4" fill="#f2c14e"/>
 </svg>
