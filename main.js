@@ -207,6 +207,95 @@ function syncBeams(list) {
   });
 }
 
+// --- Night halos: soft additive glow around lit windows and lamps, drawn as plain geometry ---
+const GLOW_COLOR = 'vec3(1.0, 0.72, 0.38)';
+const glowFade = `smoothstep(aBorn + 0.4, aBorn + 1.0, uTime) * uNight`;
+// Windows: a quad in front of the wall whose brightness falls off with the distance from the pane
+const HALO_PAD = 0.22, HALO_OFF = 0.07;
+const haloMaterial = new THREE.ShaderMaterial({
+  uniforms: { uTime, uNight },
+  vertexShader: `attribute vec2 aLocal; attribute vec2 aSize; attribute float aBorn;
+uniform float uTime, uNight;
+varying vec2 vLocal, vSize; varying float vFade;
+void main() {
+  vLocal = aLocal; vSize = aSize;
+  vec4 wp = modelMatrix * vec4(position, 1.0);
+  // Fade out when the wall is seen edge-on, so the flat quad never shows its outline
+  float facing = smoothstep(0.05, 0.35, abs(dot(normalize(cameraPosition - wp.xyz), normal)));
+  vFade = ${glowFade} * facing;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`,
+  fragmentShader: `varying vec2 vLocal, vSize; varying float vFade;
+void main() {
+  float d = length(max(abs(vLocal) - vSize, 0.0)) / ${HALO_PAD.toFixed(2)};
+  float a = pow(1.0 - clamp(d, 0.0, 1.0), 2.2) * (d > 0.0 ? 1.0 : 0.2);
+  gl_FragColor = vec4(${GLOW_COLOR} * a * vFade * 0.45, 1.0);
+}`,
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+});
+// Lamps: a round sprite pulled towards the camera so the wall behind does not cut it
+const glowMaterial = new THREE.ShaderMaterial({
+  uniforms: { uTime, uNight, uScale: { value: 1 } },
+  vertexShader: `attribute float aBorn;
+uniform float uTime, uNight, uScale;
+varying float vFade;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = 0.9 * uScale * projectionMatrix[1][1] / -mv.z;
+  mv.xyz += normalize(-mv.xyz) * 0.3;
+  vFade = ${glowFade};
+  gl_Position = projectionMatrix * mv;
+}`,
+  fragmentShader: `varying float vFade;
+void main() {
+  float a = pow(max(0.0, 1.0 - length(gl_PointCoord - 0.5) * 2.0), 2.5);
+  gl_FragColor = vec4(${GLOW_COLOR} * a * vFade * 0.8, 1.0);
+}`,
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const halos = new THREE.Mesh(new THREE.BufferGeometry(), haloMaterial);
+const glows = new THREE.Points(new THREE.BufferGeometry(), glowMaterial);
+for (const o of [halos, glows]) { o.frustumCulled = false; o.raycast = () => {}; scene.add(o); }
+const glowScale = () => { glowMaterial.uniforms.uScale.value = renderer.getDrawingBufferSize(new THREE.Vector2()).y / 2; };
+glowScale();
+
+function syncHalos(list, lampList) {
+  // Both halves of a face report the same window: merge them and average their normals
+  const byKey = new Map();
+  for (const h of list) {
+    const k = `${Math.round(h.x * 100)},${Math.round(h.y * 100)},${Math.round(h.z * 100)}`;
+    const o = byKey.get(k);
+    if (o) { o.nx += h.nx; o.nz += h.nz; } else byKey.set(k, { ...h });
+  }
+  const pos = [], nrm = [], local = [], size = [], born = [], index = [];
+  for (const h of byKey.values()) {
+    const nl = Math.hypot(h.nx, h.nz) || 1, nx = h.nx / nl, nz = h.nz / nl;
+    const ex = h.hw + HALO_PAD, ey = h.hh + HALO_PAD, base = pos.length / 3;
+    for (const [su, sv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      pos.push(h.x + nx * HALO_OFF - nz * su * ex, h.y + sv * ey, h.z + nz * HALO_OFF + nx * su * ex);
+      nrm.push(nx, 0, nz);
+      local.push(su * ex, sv * ey);
+      size.push(h.hw, h.hh);
+      born.push(h.born);
+    }
+    index.push(base, base + 2, base + 1, base, base + 3, base + 2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('aLocal', new THREE.Float32BufferAttribute(local, 2));
+  g.setAttribute('aSize', new THREE.Float32BufferAttribute(size, 2));
+  g.setAttribute('aBorn', new THREE.Float32BufferAttribute(born, 1));
+  g.setIndex(index);
+  halos.geometry.dispose();
+  halos.geometry = g;
+  const p = new THREE.BufferGeometry();
+  p.setAttribute('position', new THREE.Float32BufferAttribute(lampList.flatMap((l) => [l.x, l.y, l.z]), 3));
+  p.setAttribute('aBorn', new THREE.Float32BufferAttribute(lampList.map((l) => l.born), 1));
+  glows.geometry.dispose();
+  glows.geometry = p;
+}
+
 const SMOKE_MAX = 300;
 const smokeMesh = new THREE.InstancedMesh(
   new THREE.IcosahedronGeometry(1, 2),
@@ -494,6 +583,7 @@ function rebuild() {
   }
   chimneys = built.fx.smoke;
   syncBeams(built.fx.lamps);
+  syncHalos(built.fx.halos, built.fx.glows);
   syncBoats(built.fx.boats);
 }
 
@@ -1068,6 +1158,7 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  glowScale();
 });
 
 if (!loadFromHash()) newWorld(42, showcaseTown);
@@ -1107,6 +1198,7 @@ renderer.setAnimationLoop(() => {
   const beam = beamMaterial.uniforms.opacity;
   beam.value = (0.35 * Math.max(0, uNight.value - 0.2)) / 0.8;
   beamGroup.visible = beam.value > 0.002;
+  halos.visible = glows.visible = uNight.value > 0.01;
   for (const l of lamps) {
     l.g.rotation.y = t * 0.8 + l.phase;
     l.g.scale.setScalar(Math.min(1, Math.max(0.001, (t - l.born - 0.4) / 0.6)));

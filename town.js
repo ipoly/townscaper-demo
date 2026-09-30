@@ -858,6 +858,8 @@ export class Town {
 
     // Box aligned to a horizontal direction dir (unit, 2D)
     const box = (c2, y0, y1, half, dir, color, m) => {
+      // Lamps get a round halo at night
+      if (color === LAMP) R.fx.glows.push({ x: c2[0], y: (y0 + y1) / 2, z: c2[1], born: (m.pond ?? infoOf(m.v, m.L).info).b });
       const [dx, dz] = dir;
       const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => [
         c2[0] + (dx * s - dz * t) * half,
@@ -1577,9 +1579,18 @@ export class Town {
         quad(pt(w - U(0.06), yT), pt(w, yT), pt(w, yM), pt(w - U(0.02), yM), towards, c, m);
         quad(pt(w - U(0.02), yM), pt(w, yM), pt(w, yA + 0.02), pt(w - U(0.035), yA + 0.02), towards, c, m);
       };
+      // Lit windows spill a soft halo onto the wall at night: center, outward normal and half size.
+      // Both halves of a face push the same halo; the renderer keeps one
+      const halo = (yc, hw, hh) => {
+        const I = infoOf(v, L).info;
+        if (!I.lit) return;
+        const c = at(tm(0), 0);
+        R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, born: I.b });
+      };
       // Big window with a chunky frame, optionally round-arched; hw is its half width
       const window1 = (hw, h0, h1, round = false, drape = null) => {
         const w = U(hw), f = U(FRAME), yA = y0 + h0, yB = y0 + h1;
+        halo((yA + yB) / 2, hw, (yB - yA) / 2);
         const ys = round ? yB - hw : yB; // springline of the arch
         skyGlass(yA, yB);
         rect(tm(0), tm(w), h0, ys - y0, WINDOW, 0.004);
@@ -1596,6 +1607,7 @@ export class Town {
       };
       // Round window: this half draws its half disc
       const porthole = (r, hc) => {
+        halo(y0 + hc, r, r);
         fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, WHITE);
         skyGlass(y0 + hc - r, y0 + hc + r);
         fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, WINDOW);
@@ -2204,7 +2216,7 @@ export class Town {
         const cached = this.cache.get(q);
         if (cached && cached.sig === sig) return cached;
       }
-      R = { position: [], normal: [], color: [], aPivot: [], aBorn: [], aGlow: [], aWave: [], normals: [], edgeless: [], meta: [], fx: { smoke: [], lamps: [], boats: [] } };
+      R = { position: [], normal: [], color: [], aPivot: [], aBorn: [], aGlow: [], aWave: [], normals: [], edgeless: [], meta: [], fx: { smoke: [], lamps: [], boats: [], halos: [], glows: [] } };
       emitQuad(q);
       const rec = this.finishRecord(R, q, cosT);
       rec.sig = sig;
@@ -2212,7 +2224,7 @@ export class Town {
       return rec;
     });
     if (useCache) this.records = records;
-    const fx = { smoke: [], lamps: [], boats: [] };
+    const fx = { smoke: [], lamps: [], boats: [], halos: [], glows: [] };
     for (const r of records) for (const key in fx) fx[key].push(...r.fx[key]);
     return { recOf: new Map(quads.map((q, i) => [q, records[i]])), fx };
   }

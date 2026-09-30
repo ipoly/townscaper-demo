@@ -192,3 +192,7 @@ the original Townscaper.
    swatch material uses it too, so swatches still match.
  - A fuller fake subsurface scattering (wrap lighting, light through edges, colored rim, roughness 0.5)
    was tried first and dropped: it read as plastic. The surfaces stay matte (roughness 0.85).
+- 2026-09-30: halos at dusk and night.
+ - Lit windows get a soft rounded glow quad just off the wall, and box lamps get a glowing sprite. Both
+   are additive, fade in with `uNight`, and are hidden by day.
+ - This replaces bloom without any full-screen pass: one small mesh and one point set, rebuilt with the town.
