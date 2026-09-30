@@ -26,6 +26,7 @@ controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.45;
 controls.minDistance = 6;
 controls.maxDistance = 50;
+controls.autoRotateSpeed = 0.5; // a full circle in two minutes (orbit mode)
 
 const hemi = new THREE.HemisphereLight('#fff6e8', '#a89c8a', 1.4);
 scene.add(hemi);
@@ -237,12 +238,13 @@ const lookOf = (m) => ({
 });
 const cloneLook = (l) => Object.fromEntries(Object.entries(l).map(([k, v]) => [k, typeof v === 'number' ? v : v.clone()]));
 const look = lookOf(MOODS[0]);
-let moodIndex = 0, moodFrom = null, moodTo = null, moodStart = 0;
-function setMood(i) {
+let moodIndex = 0, moodFrom = null, moodTo = null, moodStart = 0, moodEase = 1.6;
+function setMood(i, ease = 1.6) {
   moodFrom = cloneLook(look);
   moodTo = lookOf(MOODS[i]);
   moodIndex = i;
   moodStart = now();
+  moodEase = ease;
   const btn = document.getElementById('btn-mood');
   for (const svg of btn.querySelectorAll('svg')) svg.toggleAttribute('hidden', svg.dataset.mood !== MOODS[i].name);
   btn.dataset.tip = `${MOODS[i].name} · switch to ${MOODS[(i + 1) % MOODS.length].name} (N)`;
@@ -250,7 +252,7 @@ function setMood(i) {
 }
 function updateMood(t) {
   if (!moodFrom) return false;
-  const k = Math.min(1, (t - moodStart) / 1.6);
+  const k = Math.min(1, (t - moodStart) / moodEase);
   const e = k * k * (3 - 2 * k);
   for (const key in look) {
     look[key] = typeof look[key] === 'number' ? THREE.MathUtils.lerp(moodFrom[key], moodTo[key], e) : look[key].copy(moodFrom[key]).lerp(moodTo[key], e);
@@ -260,19 +262,20 @@ function updateMood(t) {
 }
 
 // --- Rain: an overcast sky over any time of day, eased in and out ---
-let raining = false, rainFrom = 0, rainStart = -Infinity;
-const RAIN_EASE = 2.5, RAIN_FOG = [20, 58];
-function setRain(on) {
+let raining = false, rainFrom = 0, rainStart = -Infinity, rainEase = 2.5;
+const RAIN_FOG = [20, 58];
+function setRain(on, ease = 2.5) {
   raining = on;
   rainFrom = uRain.value;
   rainStart = now();
+  rainEase = ease;
   const btn = document.getElementById('btn-rain');
   btn.classList.toggle('on', on);
   btn.setAttribute('aria-pressed', String(on));
   sfx.setRain(on ? 1 : 0);
 }
 function updateRain(t) {
-  const k = Math.min(1, (t - rainStart) / RAIN_EASE);
+  const k = Math.min(1, (t - rainStart) / rainEase);
   if (k >= 1 && uRain.value === +raining) return false;
   uRain.value = THREE.MathUtils.lerp(rainFrom, +raining, k * k * (3 - 2 * k));
   return true;
@@ -1168,12 +1171,21 @@ async function share() {
 }
 
 // --- Screenshot ---
-// A clean frame without the grid and hover preview, read back in the same task as the render,
-// while the drawing buffer still holds it. Phones get the share sheet (save to Photos), others a download.
+// A clean frame without the grid and hover preview, rendered at a higher pixel ratio for a sharp
+// picture and read back in the same task as the render, while the drawing buffer still holds it.
+// Phones get the share sheet (save to Photos), others a download.
 const coarse = matchMedia('(hover: none) and (pointer: coarse)');
+function shotRatio() {
+  const gl = renderer.getContext();
+  const max = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), ...gl.getParameter(gl.MAX_VIEWPORT_DIMS));
+  return Math.min(coarse.matches ? 2 : 3, max / Math.max(innerWidth, innerHeight));
+}
 function screenshot() {
   const hidden = [gridLines, ghost].filter((o) => o && o.visible);
   for (const o of hidden) o.visible = false;
+  const ratio = renderer.getPixelRatio();
+  renderer.setPixelRatio(Math.max(ratio, shotRatio()));
+  glowScale();
   renderer.render(scene, camera);
   renderer.domElement.toBlob(async (blob) => {
     if (!blob) return toast('Could not take a picture');
@@ -1192,12 +1204,70 @@ function screenshot() {
     toast('Picture saved');
   }, 'image/png');
   for (const o of hidden) o.visible = true;
+  // Back to the screen size, redrawn at once so the resized canvas never shows up blank
+  renderer.setPixelRatio(ratio);
+  glowScale();
+  renderer.render(scene, camera);
   sfx.shutter();
   flashEl.classList.remove('flash');
   void flashEl.offsetWidth; // restart the animation
   flashEl.classList.add('flash');
 }
 const flashEl = document.getElementById('flash');
+
+// --- Orbit mode: after a while without input (or with O) the UI steps aside, the camera circles
+// the town and the time of day and weather move on by themselves. Any input brings it back ---
+const ORBIT_AFTER = 30, ORBIT_STEP = 25; // idle seconds before it starts, seconds per time of day
+let orbiting = false, lastInput = now(), orbitNext = 0, gridWasOn = true, swallowUp = false;
+function setOrbit(on) {
+  if (on === orbiting) return;
+  orbiting = on;
+  document.body.classList.toggle('orbit', on);
+  controls.autoRotate = on;
+  lastInput = now();
+  if (on) {
+    gridWasOn = gridLines.visible;
+    gridLines.visible = false;
+    setHover(null);
+    orbitNext = now() + ORBIT_STEP;
+  } else {
+    gridLines.visible = gridWasOn;
+  }
+}
+function updateOrbit(t) {
+  if (!orbiting) {
+    if (t - lastInput > ORBIT_AFTER && !stroke) setOrbit(true);
+    return;
+  }
+  if (t < orbitNext) return;
+  orbitNext = t + ORBIT_STEP;
+  setMood((moodIndex + 1) % MOODS.length, 6);
+  // Now and then the weather turns; showers clear up more readily than they start
+  if (Math.random() < (raining ? 0.5 : 0.25)) setRain(!raining, 6);
+}
+// The input that wakes the town only wakes it: no block, no zoom, no shortcut. A mouse wakes it by
+// moving, so presses right after waking are held back too
+let wokeAt = -Infinity;
+for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
+  addEventListener(type, (e) => {
+    lastInput = now();
+    if (orbiting) {
+      setOrbit(false);
+      wokeAt = lastInput;
+    } else if (lastInput - wokeAt > 0.6) return;
+    if (type === 'pointermove') return;
+    e.stopPropagation();
+    if (type === 'pointerdown') swallowUp = true;
+  }, { capture: true });
+}
+addEventListener('pointerup', (e) => {
+  if (!swallowUp) return;
+  swallowUp = false;
+  e.stopPropagation();
+}, { capture: true });
+// Coming back to a hidden tab is not the same as leaving it alone
+document.addEventListener('visibilitychange', () => { lastInput = now(); });
+
 
 // --- Input ---
 // Left click/drag: build on the level of the first block of the stroke; occupied cells stack upwards
@@ -1531,6 +1601,7 @@ addEventListener('keydown', (e) => {
   if (key === 'm') toggleMute();
   if (key === 's') share();
   if (key === 'p') screenshot();
+  if (key === 'o') setOrbit(true);
 });
 
 addEventListener('resize', () => {
@@ -1555,9 +1626,10 @@ renderer.setAnimationLoop(() => {
   const t = now();
   // Small slack so a 60Hz display lands on every second frame instead of drifting
   if (t - lastActive > IDLE_AFTER && t - lastFrame < IDLE_FRAME - 0.004) return;
+  const dt = Math.min(0.1, t - lastFrame);
   lastFrame = t;
   uTime.value = t;
-  controls.update();
+  controls.update(dt);
   if (needsRebuild) {
     needsRebuild = false;
     rebuild();
@@ -1571,6 +1643,7 @@ renderer.setAnimationLoop(() => {
   }
   if (ghost) ghostMaterial.opacity = 0.35 + 0.15 * Math.sin(t * 6);
   updateTransitions(t);
+  updateOrbit(t);
   if (updateMood(t) | updateRain(t)) applyLook();
   updateSmoke(t);
   updateBoats(t);
@@ -1605,5 +1678,5 @@ if ('serviceWorker' in navigator) {
 
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
-  undo, redo, setMood, setRain, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
+  undo, redo, setMood, setRain, setOrbit, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
 };

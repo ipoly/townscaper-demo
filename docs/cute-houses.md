@@ -237,3 +237,11 @@ the original Townscaper.
  - A soft rain hiss with sparse patter fades in over the surf.
  - The mood blend now lives in its own state, and the weather is layered over it when both are
    written to the scene.
+- 2026-09-30: sharper pictures, and an orbit mode.
+ - Pictures render at 3x the page size (2x on phones, capped by the GPU's limits), so they come out
+   sharp instead of at screen resolution; window glows are scaled to match.
+ - Orbit mode starts after 30 s without input (or with O): the UI fades away, the camera circles the
+   town once every two minutes, the time of day moves on every 25 s with slower blends, and now and
+   then a shower comes or clears up.
+ - Any input brings the UI back; that first press (and any within 0.6 s of waking) does nothing
+   else, so waking never builds a block.

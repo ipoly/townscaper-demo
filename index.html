@@ -133,6 +133,9 @@
       padding: 8px 16px; border-radius: 999px; font-size: 13px;
       opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none;
     }
+    /* Orbit mode: only the town */
+    body.orbit :is(#tools, #palette, #help, #help-open, #modes, #toast) { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.8s !important; }
+    body.orbit canvas { cursor: none; }
     #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
     #flash.flash { animation: flash 0.35s ease-out; }
     @keyframes flash { from { opacity: 0.7; } to { opacity: 0; } }
@@ -236,6 +239,7 @@
       <dt><kbd>N</kbd> <kbd>W</kbd></dt><dd>Time of day · rain</dd>
       <dt><kbd>G</kbd> <kbd>M</kbd></dt><dd>Grid · sound</dd>
       <dt><kbd>P</kbd> <kbd>S</kbd> <kbd>C</kbd></dt><dd>Picture · share link · clear</dd>
+      <dt><kbd>O</kbd></dt><dd>Orbit (also after 30 s idle)</dd>
       <dt><kbd>H</kbd></dt><dd>Toggle this help</dd>
     </dl>
   </aside>
