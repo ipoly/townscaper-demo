@@ -42,6 +42,71 @@ let lastActive = now(); // last input, camera move or town change
 const uTime = { value: now() };
 const uNight = { value: 0 };
 const uRays = { value: 0 }; // dawn light shafts
+const uDay = { value: 1 }; // cloud shadows and sea sparkles
+const uDusk = { value: 0 }; // sunset glitter on the sea
+const uSunDir = { value: new THREE.Vector3() };
+// Lit windows switch on in their own order (0 < order <= 1) as uNight rises, so floors light up one by one
+const LIGHT_ON = `float lightOn(float order) { return order > 0.0 ? smoothstep(order * 0.5, order * 0.5 + 0.04, uNight) * uNight : 0.0; }`;
+
+// Sky over the town and sea: drifting cloud shadows by day, and on the water sparkles by day and the
+// sunset's glitter path at dusk. All of it is a few lines in the existing materials, no extra pass
+const SKY_GLSL = `uniform float uTime, uDay, uDusk;
+uniform vec3 uSunDir, uSunColor;
+varying vec3 vWorldPos;
+float skyHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float skyNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(skyHash(i), skyHash(i + vec2(1.0, 0.0)), f.x), mix(skyHash(i + vec2(0.0, 1.0)), skyHash(i + vec2(1.0)), f.x), f.y);
+}
+float cloudShadow(vec2 p) {
+  p = p * 0.06 + uTime * vec2(0.035, 0.015);
+  float n = skyNoise(p) * 0.65 + skyNoise(p * 2.3 + 7.0) * 0.35;
+  return smoothstep(0.5, 0.66, n) * uDay;
+}`;
+function withSky(material, { water = false } = {}) {
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, r) => {
+    prev?.call(material, shader, r);
+    Object.assign(shader.uniforms, { uTime, uDay, uDusk, uSunDir, uSunColor: { value: sun.color } });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWorldPos;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${SKY_GLSL}`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+{
+  float shade = 1.0 - 0.45 * cloudShadow(vWorldPos.xz);
+  reflectedLight.directDiffuse *= shade;
+  reflectedLight.directSpecular *= shade;
+}`);
+    if (water) {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+{
+  float near = 1.0 - smoothstep(22.0, 40.0, length(cameraPosition - vWorldPos));
+  // Day: a few tiny glints that twinkle on and off, out of the cloud shadows
+  vec2 sp = vWorldPos.xz * 1.3, cell = floor(sp);
+  float h = skyHash(cell);
+  vec2 spot = vec2(skyHash(cell + 3.1), skyHash(cell + 5.7)) * 0.6 + 0.2;
+  float twinkle = pow(max(0.0, sin(uTime * (1.5 + h * 2.0) + h * 40.0)), 12.0);
+  float glint = step(0.82, h) * twinkle * smoothstep(0.1, 0.0, length(fract(sp) - spot));
+  totalEmissiveRadiance += vec3(1.0, 0.98, 0.9) * glint * uDay * (1.0 - cloudShadow(vWorldPos.xz)) * near * 2.0;
+  // Dusk: a band of light on the sea towards the low sun, broken into fine flickering glitter
+  vec3 refl = reflect(-normalize(cameraPosition - vWorldPos), vec3(0.0, 1.0, 0.0));
+  float path = pow(max(dot(refl, uSunDir), 0.0), 48.0);
+  vec2 gp = vWorldPos.xz * vec2(5.0, 2.5), gcell = floor(gp);
+  float gh = skyHash(gcell);
+  float flicker = pow(max(0.0, sin(uTime * (2.0 + gh * 3.0) + gh * 60.0)), 4.0);
+  float glitter = step(0.4, gh) * flicker * smoothstep(0.35, 0.0, length(fract(gp) - 0.5));
+  totalEmissiveRadiance += uSunColor * path * (0.3 + glitter * 6.0) * uDusk * near;
+}`);
+    }
+  };
+  // Wrapped callbacks share their source text, so keep the program cache from mixing town and water
+  const base = prev?.toString() ?? '';
+  material.customProgramCacheKey = () => base + (water ? 'sky-water' : 'sky');
+  return material;
+}
 
 // Low-poly water: vertices bob in the shader (local z is up), flat shading turns that into facets
 const waterMaterial = new THREE.MeshStandardMaterial({ color: '#5aa6c4', roughness: 0.35, metalness: 0.1, flatShading: true });
@@ -53,6 +118,7 @@ waterMaterial.onBeforeCompile = (shader) => {
 float fade = 1.0 - smoothstep(20.0, 40.0, length(position.xy));
 transformed.z += fade * (sin(position.x * 0.8 + uTime * 1.3) * 0.035 + sin(position.y * 1.1 - uTime * 1.1) * 0.03);`);
 };
+withSky(waterMaterial, { water: true });
 const water = new THREE.Mesh(new THREE.PlaneGeometry(160, 160, 140, 140), waterMaterial);
 water.rotation.x = -Math.PI / 2;
 water.receiveShadow = true;
@@ -102,9 +168,9 @@ if (popT < 1.0) {
 }`);
     if (glow) {
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vGlow;\nuniform float uNight;')
+        .replace('#include <common>', `#include <common>\nvarying float vGlow;\nuniform float uNight;\n${LIGHT_ON}`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-totalEmissiveRadiance += vGlow * uNight * vec3(1.0, 0.68, 0.3) * 1.8;`);
+totalEmissiveRadiance += lightOn(vGlow) * vec3(1.0, 0.68, 0.3) * 1.8;`);
     }
   };
   return material;
@@ -127,18 +193,18 @@ function withColoredShade(material) {
   return material;
 }
 
-const townMaterial = withColoredShade(withPop(new THREE.MeshStandardMaterial({
+const townMaterial = withSky(withColoredShade(withPop(new THREE.MeshStandardMaterial({
   vertexColors: true, flatShading: true, roughness: 0.85,
   polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-}), { glow: true }));
+}), { glow: true })));
 const townDepthMaterial = withPop(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
 const outlineMaterial = withPop(new THREE.LineBasicMaterial({ color: '#6b5446', transparent: true, opacity: 0.3 }));
 const ghostMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45, depthWrite: false });
 
 // --- Day / dusk / night / dawn ---
 const MOODS = [
-  { name: 'Day', bg: '#cfe6ec', sky: '#fff6e8', ground: '#a89c8a', hemi: 1.4, sun: '#fff1d6', sunI: 2.2, sunPos: [12, 20, 8], water: '#5aa6c4', night: 0, exp: 1.3 },
-  { name: 'Dusk', bg: '#f0b48e', sky: '#ffd0a8', ground: '#5a6f8f', hemi: 1.0, sun: '#ff9458', sunI: 1.7, sunPos: [20, 6, 2], water: '#6b8fb2', night: 0.45, exp: 1.2 },
+  { name: 'Day', bg: '#cfe6ec', sky: '#fff6e8', ground: '#a89c8a', hemi: 1.4, sun: '#fff1d6', sunI: 2.2, sunPos: [12, 20, 8], water: '#5aa6c4', night: 0, exp: 1.3, day: 1 },
+  { name: 'Dusk', bg: '#f0b48e', sky: '#ffd0a8', ground: '#5a6f8f', hemi: 1.0, sun: '#ff9458', sunI: 1.7, sunPos: [20, 6, 2], water: '#6b8fb2', night: 0.45, exp: 1.2, dusk: 1 },
   { name: 'Night', bg: '#1c2744', sky: '#8492c4', ground: '#26324c', hemi: 1.0, sun: '#aabcff', sunI: 0.7, sunPos: [-10, 18, -6], water: '#1f3654', night: 1, exp: 0.95 },
   // Cool pastel light from the side opposite dusk, a thin mist and a few windows still lit
   { name: 'Dawn', bg: '#e6d4de', sky: '#f2e2f2', ground: '#8a90ad', hemi: 1.25, sun: '#ffc6a0', sunI: 1.5, sunPos: [-18, 6, 6], water: '#8fb2c9', night: 0.15, exp: 1.25, fog: [16, 55], rays: 1 },
@@ -151,7 +217,7 @@ const moodTo = {
   sunPos: new THREE.Vector3(),
 };
 const snapshotMood = () => ({
-  fog: new THREE.Vector2(scene.fog.near, scene.fog.far), rays: uRays.value, bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
+  fog: new THREE.Vector2(scene.fog.near, scene.fog.far), rays: uRays.value, day: uDay.value, dusk: uDusk.value, bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
   water: waterMaterial.color.clone(), hemi: hemi.intensity, sunI: sun.intensity, sunPos: sun.position.clone(), night: uNight.value, exp: renderer.toneMappingExposure,
 });
 function setMood(i) {
@@ -182,6 +248,8 @@ function updateMood(t) {
   sun.position.copy(moodFrom.sunPos).lerp(moodTo.sunPos.fromArray(to.sunPos), e);
   uNight.value = THREE.MathUtils.lerp(moodFrom.night, to.night, e);
   uRays.value = THREE.MathUtils.lerp(moodFrom.rays, to.rays ?? 0, e);
+  uDay.value = THREE.MathUtils.lerp(moodFrom.day, to.day ?? 0, e);
+  uDusk.value = THREE.MathUtils.lerp(moodFrom.dusk, to.dusk ?? 0, e);
   renderer.toneMappingExposure = THREE.MathUtils.lerp(moodFrom.exp, to.exp, e);
   starMaterial.opacity = Math.max(0, uNight.value - 0.4) / 0.6;
   if (k >= 1) moodFrom = null;
@@ -222,15 +290,16 @@ const glowFade = `smoothstep(aBorn + 0.4, aBorn + 1.0, uTime) * uNight`;
 const HALO_PAD = 0.22, HALO_OFF = 0.07;
 const haloMaterial = new THREE.ShaderMaterial({
   uniforms: { uTime, uNight },
-  vertexShader: `attribute vec2 aLocal; attribute vec2 aSize; attribute vec2 aRound; attribute float aBorn;
+  vertexShader: `attribute vec2 aLocal; attribute vec2 aSize; attribute vec2 aRound; attribute float aBorn, aOrder;
 uniform float uTime, uNight;
+${LIGHT_ON}
 varying vec2 vLocal, vSize, vRound; varying float vFade;
 void main() {
   vLocal = aLocal; vSize = aSize; vRound = aRound;
   vec4 wp = modelMatrix * vec4(position, 1.0);
   // Fade out when the wall is seen edge-on, so the flat quad never shows its outline
   float facing = smoothstep(0.05, 0.35, abs(dot(normalize(cameraPosition - wp.xyz), normal)));
-  vFade = ${glowFade} * facing;
+  vFade = smoothstep(aBorn + 0.4, aBorn + 1.0, uTime) * lightOn(aOrder) * facing;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`,
   fragmentShader: `varying vec2 vLocal, vSize, vRound; varying float vFade;
@@ -279,7 +348,7 @@ function syncHalos(list, lampList) {
     const o = byKey.get(k);
     if (o) { o.nx += h.nx; o.nz += h.nz; } else byKey.set(k, { ...h });
   }
-  const pos = [], nrm = [], local = [], size = [], round = [], born = [], index = [];
+  const pos = [], nrm = [], local = [], size = [], round = [], order = [], born = [], index = [];
   for (const h of byKey.values()) {
     const nl = Math.hypot(h.nx, h.nz) || 1, nx = h.nx / nl, nz = h.nz / nl;
     const ex = h.hw + HALO_PAD, ey = h.hh + HALO_PAD, base = pos.length / 3;
@@ -289,6 +358,7 @@ function syncHalos(list, lampList) {
       local.push(su * ex, sv * ey);
       size.push(h.hw, h.hh);
       round.push(h.rb, h.rt);
+      order.push(h.order);
       born.push(h.born);
     }
     index.push(base, base + 2, base + 1, base, base + 3, base + 2);
@@ -299,6 +369,7 @@ function syncHalos(list, lampList) {
   g.setAttribute('aLocal', new THREE.Float32BufferAttribute(local, 2));
   g.setAttribute('aSize', new THREE.Float32BufferAttribute(size, 2));
   g.setAttribute('aRound', new THREE.Float32BufferAttribute(round, 2));
+  g.setAttribute('aOrder', new THREE.Float32BufferAttribute(order, 1));
   g.setAttribute('aBorn', new THREE.Float32BufferAttribute(born, 1));
   g.setIndex(index);
   halos.geometry.dispose();
@@ -312,7 +383,6 @@ function syncHalos(list, lampList) {
 
 // --- Dawn light shafts: long soft strips slanting in from the sun, turned to face the camera ---
 const RAY_COUNT = 9, RAY_LENGTH = 16;
-const uSunDir = { value: new THREE.Vector3() };
 const rayMaterial = new THREE.ShaderMaterial({
   uniforms: { uTime, uRays, uSunDir },
   vertexShader: `attribute vec2 aCorner; attribute vec2 aSeed;
@@ -488,7 +558,9 @@ const puffs = [];
 const tmpMat = new THREE.Matrix4(), tmpQuat = new THREE.Quaternion(), tmpPos = new THREE.Vector3(), tmpScale = new THREE.Vector3();
 
 function updateSmoke(t) {
-  for (const c of chimneys) {
+  // Chimneys only smoke at dusk, when supper is on; puffs already out drift away
+  if (uDusk.value < 0.5) chimneyNext.clear();
+  else for (const c of chimneys) {
     if (t < c.born + 0.8) continue;
     const key = `${c.x.toFixed(2)},${c.z.toFixed(2)}`;
     const next = chimneyNext.get(key) ?? t + c.seed * 1.5;

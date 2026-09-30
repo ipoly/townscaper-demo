@@ -211,3 +211,11 @@ the original Townscaper.
  - Four stacked horizontal sheets over the town, low to mid height, carrying soft noise that drifts
    slowly and fades out at the edges, tinted from the sky toward the sun.
  - Only drawn at dawn (one extra draw call), so the shafts have something in the air to light up.
+- 2026-09-30: day and dusk get their own touches.
+ - Day: soft cloud shadows drift over the town and sea, and tiny glints twinkle on the water
+   outside them.
+ - Dusk: a band of flickering glitter on the sea towards the low sun (seen when facing the sunset).
+ - Lit floors switch on in their own random order as night falls, street lamps first: at dusk about
+   four in five are on, at dawn only the early risers.
+ - Chimneys only smoke at dusk.
+ - All of it lives in the existing town and water shaders, no extra draw calls.

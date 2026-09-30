@@ -49,6 +49,7 @@ const GOLD = new THREE.Color('#e0b84a');
 const SLATE = new THREE.Color('#4e5f78');
 const LH_RED = new THREE.Color('#c9473a');
 const LAMP = new THREE.Color('#fff3b8');
+const LAMP_ORDER = 0.08; // street lamps come on before any window
 const WOOD = new THREE.Color('#7d5f43');
 const PLANKS = ['#b8925f', '#a98556'].map((c) => new THREE.Color(c));
 const DECK_TOP = new THREE.Color('#d8cbb0');
@@ -647,7 +648,8 @@ export class Town {
       br: units.bridge.has(k),
       tr: units.terrace.has(k),
       r: this.roofRise(v, L, units),
-      lit: hash(v, L, 77) < 0.7 ? 1 : 0,
+      // 0 stays dark; otherwise the switch-on order, so floors light up one by one as night falls
+      lit: hash(v, L, 77) < 0.7 ? 0.02 + 0.98 * hash(v, L, 78) : 0,
     };
     const sup = units.support.get(k);
     const attached = () => this.grid.neighbors[v].filter((u) => this.has(u, L)).sort((a, b) => a - b);
@@ -824,7 +826,7 @@ export class Town {
       const n = [nx / len, ny / len, nz / len];
       const pv = this.pivot(m.v, m.L);
       const cell = m.pond ?? infoOf(m.v, m.L).info;
-      const glow = color === LAMP ? 1 : color === WINDOW || CURTAINS.includes(color) ? cell.lit : 0;
+      const glow = color === LAMP ? LAMP_ORDER : color === WINDOW || CURTAINS.includes(color) ? cell.lit : 0;
       for (const p of [a, b, c]) {
         R.position.push(p[0], p[1], p[2]);
         R.normal.push(n[0], n[1], n[2]);
@@ -1586,7 +1588,7 @@ export class Town {
         const I = infoOf(v, L).info;
         if (!I.lit) return;
         const c = at(tm(0), 0);
-        R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, rb, rt, born: I.b });
+        R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, rb, rt, order: I.lit, born: I.b });
       };
       // Big window with a chunky frame, optionally round-arched; hw is its half width
       const window1 = (hw, h0, h1, round = false, drape = null) => {
