@@ -1579,18 +1579,19 @@ export class Town {
         quad(pt(w - U(0.06), yT), pt(w, yT), pt(w, yM), pt(w - U(0.02), yM), towards, c, m);
         quad(pt(w - U(0.02), yM), pt(w, yM), pt(w, yA + 0.02), pt(w - U(0.035), yA + 0.02), towards, c, m);
       };
-      // Lit windows spill a soft halo onto the wall at night: center, outward normal and half size.
-      // Both halves of a face push the same halo; the renderer keeps one
-      const halo = (yc, hw, hh) => {
+      // Lit windows spill a soft halo onto the wall at night: center, outward normal, half size and the
+      // corner radius below and above (round windows and arches). Both halves of a face push the same halo;
+      // the renderer keeps one
+      const halo = (yc, hw, hh, rb = 0, rt = 0) => {
         const I = infoOf(v, L).info;
         if (!I.lit) return;
         const c = at(tm(0), 0);
-        R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, born: I.b });
+        R.fx.halos.push({ x: c[0], y: yc, z: c[1], nx, nz, hw, hh, rb, rt, born: I.b });
       };
       // Big window with a chunky frame, optionally round-arched; hw is its half width
       const window1 = (hw, h0, h1, round = false, drape = null) => {
         const w = U(hw), f = U(FRAME), yA = y0 + h0, yB = y0 + h1;
-        halo((yA + yB) / 2, hw, (yB - yA) / 2);
+        halo((yA + yB) / 2, hw, (yB - yA) / 2, 0, round ? hw : 0);
         const ys = round ? yB - hw : yB; // springline of the arch
         skyGlass(yA, yB);
         rect(tm(0), tm(w), h0, ys - y0, WINDOW, 0.004);
@@ -1607,7 +1608,7 @@ export class Town {
       };
       // Round window: this half draws its half disc
       const porthole = (r, hc) => {
-        halo(y0 + hc, r, r);
+        halo(y0 + hc, r, r, r, r);
         fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, WHITE);
         skyGlass(y0 + hc - r, y0 + hc + r);
         fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, WINDOW);

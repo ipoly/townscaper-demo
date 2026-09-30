@@ -214,21 +214,25 @@ const glowFade = `smoothstep(aBorn + 0.4, aBorn + 1.0, uTime) * uNight`;
 const HALO_PAD = 0.22, HALO_OFF = 0.07;
 const haloMaterial = new THREE.ShaderMaterial({
   uniforms: { uTime, uNight },
-  vertexShader: `attribute vec2 aLocal; attribute vec2 aSize; attribute float aBorn;
+  vertexShader: `attribute vec2 aLocal; attribute vec2 aSize; attribute vec2 aRound; attribute float aBorn;
 uniform float uTime, uNight;
-varying vec2 vLocal, vSize; varying float vFade;
+varying vec2 vLocal, vSize, vRound; varying float vFade;
 void main() {
-  vLocal = aLocal; vSize = aSize;
+  vLocal = aLocal; vSize = aSize; vRound = aRound;
   vec4 wp = modelMatrix * vec4(position, 1.0);
   // Fade out when the wall is seen edge-on, so the flat quad never shows its outline
   float facing = smoothstep(0.05, 0.35, abs(dot(normalize(cameraPosition - wp.xyz), normal)));
   vFade = ${glowFade} * facing;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`,
-  fragmentShader: `varying vec2 vLocal, vSize; varying float vFade;
+  fragmentShader: `varying vec2 vLocal, vSize, vRound; varying float vFade;
 void main() {
-  float d = length(max(abs(vLocal) - vSize, 0.0)) / ${HALO_PAD.toFixed(2)};
-  float a = pow(1.0 - clamp(d, 0.0, 1.0), 2.2) * (d > 0.0 ? 1.0 : 0.2);
+  // Signed distance to the pane outline, rounded to match round windows and arches
+  float r = vLocal.y > 0.0 ? vRound.y : vRound.x;
+  vec2 q = abs(vLocal) - vSize + r;
+  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+  // Brightest at the outline, fading out over the wall and dimming smoothly over the pane itself
+  float a = d > 0.0 ? pow(1.0 - clamp(d / ${HALO_PAD.toFixed(2)}, 0.0, 1.0), 2.2) : mix(1.0, 0.2, smoothstep(0.0, 0.05, -d));
   gl_FragColor = vec4(${GLOW_COLOR} * a * vFade * 0.45, 1.0);
 }`,
   transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
@@ -267,7 +271,7 @@ function syncHalos(list, lampList) {
     const o = byKey.get(k);
     if (o) { o.nx += h.nx; o.nz += h.nz; } else byKey.set(k, { ...h });
   }
-  const pos = [], nrm = [], local = [], size = [], born = [], index = [];
+  const pos = [], nrm = [], local = [], size = [], round = [], born = [], index = [];
   for (const h of byKey.values()) {
     const nl = Math.hypot(h.nx, h.nz) || 1, nx = h.nx / nl, nz = h.nz / nl;
     const ex = h.hw + HALO_PAD, ey = h.hh + HALO_PAD, base = pos.length / 3;
@@ -276,6 +280,7 @@ function syncHalos(list, lampList) {
       nrm.push(nx, 0, nz);
       local.push(su * ex, sv * ey);
       size.push(h.hw, h.hh);
+      round.push(h.rb, h.rt);
       born.push(h.born);
     }
     index.push(base, base + 2, base + 1, base, base + 3, base + 2);
@@ -285,6 +290,7 @@ function syncHalos(list, lampList) {
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('aLocal', new THREE.Float32BufferAttribute(local, 2));
   g.setAttribute('aSize', new THREE.Float32BufferAttribute(size, 2));
+  g.setAttribute('aRound', new THREE.Float32BufferAttribute(round, 2));
   g.setAttribute('aBorn', new THREE.Float32BufferAttribute(born, 1));
   g.setIndex(index);
   halos.geometry.dispose();
