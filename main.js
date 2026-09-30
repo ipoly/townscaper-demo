@@ -44,14 +44,15 @@ const uNight = { value: 0 };
 const uRays = { value: 0 }; // dawn light shafts
 const uDay = { value: 1 }; // cloud shadows and sea sparkles
 const uDusk = { value: 0 }; // sunset glitter on the sea
+const uRain = { value: 0 }; // overcast, falling rain, wet town
 const uSunDir = { value: new THREE.Vector3() };
 // Lit windows switch on in their own order (0 < order <= 1) as uNight rises, so floors light up one by one
 const LIGHT_ON = `float lightOn(float order) { return order > 0.0 ? smoothstep(order * 0.5, order * 0.5 + 0.04, uNight) * uNight : 0.0; }`;
 
 // Sky over the town and sea: drifting cloud shadows by day, and on the water sparkles by day and the
 // sunset's glitter path at dusk. All of it is a few lines in the existing materials, no extra pass
-const SKY_GLSL = `uniform float uTime, uDay, uDusk;
-uniform vec3 uSunDir, uSunColor;
+const SKY_GLSL = `uniform float uTime, uDay, uDusk, uRain;
+uniform vec3 uSunDir, uSunColor, uSkyColor;
 varying vec3 vWorldPos;
 float skyHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float skyNoise(vec2 p) {
@@ -68,7 +69,7 @@ function withSky(material, { water = false } = {}) {
   const prev = material.onBeforeCompile;
   material.onBeforeCompile = (shader, r) => {
     prev?.call(material, shader, r);
-    Object.assign(shader.uniforms, { uTime, uDay, uDusk, uSunDir, uSunColor: { value: sun.color } });
+    Object.assign(shader.uniforms, { uTime, uDay, uDusk, uRain, uSunDir, uSunColor: { value: sun.color }, uSkyColor: { value: hemi.color } });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWorldPos;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -99,7 +100,25 @@ function withSky(material, { water = false } = {}) {
   float flicker = pow(max(0.0, sin(uTime * (2.0 + gh * 3.0) + gh * 60.0)), 4.0);
   float glitter = step(0.4, gh) * flicker * smoothstep(0.35, 0.0, length(fract(gp) - 0.5));
   totalEmissiveRadiance += uSunColor * path * (0.3 + glitter * 6.0) * uDusk * near;
+  // Rain: rings spreading from drops, each cell starting a new one at a random spot every second or so
+  float rings = 0.0;
+  for (int i = 0; i < 2; i++) {
+    vec2 rp = vWorldPos.xz * 1.7 + float(i) * 17.3, rc = floor(rp);
+    float phase = uTime * 0.9 + skyHash(rc + float(i) * 11.0), cycle = floor(phase), age = fract(phase);
+    vec2 c = vec2(skyHash(rc + cycle * 1.7), skyHash(rc + cycle * 3.1 + 8.3)) * 0.5 + 0.25;
+    rings += smoothstep(0.035, 0.0, abs(length(fract(rp) - c) - age * 0.25)) * (1.0 - age);
+  }
+  totalEmissiveRadiance += uSkyColor * rings * uRain * near * 0.3;
 }`);
+    } else {
+      // Wet in the rain: surfaces a little darker, and a sheen of sky on the tops at grazing angles
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+float wetTop = smoothstep(0.35, 0.9, dot(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)));
+diffuseColor.rgb *= 1.0 - 0.15 * uRain;
+roughnessFactor = mix(roughnessFactor, 0.45, uRain * wetTop);`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+totalEmissiveRadiance += uSkyColor * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 4.0) * wetTop * uRain * 0.4;`);
     }
   };
   // Wrapped callbacks share their source text, so keep the program cache from mixing town and water
@@ -210,18 +229,18 @@ const MOODS = [
   { name: 'Dawn', bg: '#e6d4de', sky: '#f2e2f2', ground: '#8a90ad', hemi: 1.25, sun: '#ffc6a0', sunI: 1.5, sunPos: [-18, 6, 6], water: '#8fb2c9', night: 0.15, exp: 1.25, fog: [16, 55], rays: 1 },
 ];
 const FOG = [30, 70];
-let moodIndex = 0, moodFrom = null, moodStart = 0;
-renderer.toneMappingExposure = MOODS[0].exp;
-const moodTo = {
-  fog: new THREE.Vector2(), bg: new THREE.Color(), sky: new THREE.Color(), ground: new THREE.Color(), sun: new THREE.Color(), water: new THREE.Color(),
-  sunPos: new THREE.Vector3(),
-};
-const snapshotMood = () => ({
-  fog: new THREE.Vector2(scene.fog.near, scene.fog.far), rays: uRays.value, day: uDay.value, dusk: uDusk.value, bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
-  water: waterMaterial.color.clone(), hemi: hemi.intensity, sunI: sun.intensity, sunPos: sun.position.clone(), night: uNight.value, exp: renderer.toneMappingExposure,
+// The blended mood lives in `look`; applyLook layers the weather over it and writes the scene
+const lookOf = (m) => ({
+  fog: new THREE.Vector2(...(m.fog ?? FOG)), bg: new THREE.Color(m.bg), sky: new THREE.Color(m.sky), ground: new THREE.Color(m.ground),
+  sun: new THREE.Color(m.sun), water: new THREE.Color(m.water), sunPos: new THREE.Vector3(...m.sunPos),
+  hemi: m.hemi, sunI: m.sunI, night: m.night, exp: m.exp, rays: m.rays ?? 0, day: m.day ?? 0, dusk: m.dusk ?? 0,
 });
+const cloneLook = (l) => Object.fromEntries(Object.entries(l).map(([k, v]) => [k, typeof v === 'number' ? v : v.clone()]));
+const look = lookOf(MOODS[0]);
+let moodIndex = 0, moodFrom = null, moodTo = null, moodStart = 0;
 function setMood(i) {
-  moodFrom = snapshotMood();
+  moodFrom = cloneLook(look);
+  moodTo = lookOf(MOODS[i]);
   moodIndex = i;
   moodStart = now();
   const btn = document.getElementById('btn-mood');
@@ -230,29 +249,61 @@ function setMood(i) {
   document.body.classList.toggle('dark', MOODS[i].night > 0.7);
 }
 function updateMood(t) {
-  if (!moodFrom) return;
+  if (!moodFrom) return false;
   const k = Math.min(1, (t - moodStart) / 1.6);
   const e = k * k * (3 - 2 * k);
-  const to = MOODS[moodIndex];
-  scene.background.copy(moodFrom.bg).lerp(moodTo.bg.set(to.bg), e);
-  scene.fog.color.copy(scene.background);
-  moodTo.fog.fromArray(to.fog ?? FOG).lerp(moodFrom.fog, 1 - e);
-  scene.fog.near = moodTo.fog.x;
-  scene.fog.far = moodTo.fog.y;
-  hemi.color.copy(moodFrom.sky).lerp(moodTo.sky.set(to.sky), e);
-  hemi.groundColor.copy(moodFrom.ground).lerp(moodTo.ground.set(to.ground), e);
-  sun.color.copy(moodFrom.sun).lerp(moodTo.sun.set(to.sun), e);
-  waterMaterial.color.copy(moodFrom.water).lerp(moodTo.water.set(to.water), e);
-  hemi.intensity = THREE.MathUtils.lerp(moodFrom.hemi, to.hemi, e);
-  sun.intensity = THREE.MathUtils.lerp(moodFrom.sunI, to.sunI, e);
-  sun.position.copy(moodFrom.sunPos).lerp(moodTo.sunPos.fromArray(to.sunPos), e);
-  uNight.value = THREE.MathUtils.lerp(moodFrom.night, to.night, e);
-  uRays.value = THREE.MathUtils.lerp(moodFrom.rays, to.rays ?? 0, e);
-  uDay.value = THREE.MathUtils.lerp(moodFrom.day, to.day ?? 0, e);
-  uDusk.value = THREE.MathUtils.lerp(moodFrom.dusk, to.dusk ?? 0, e);
-  renderer.toneMappingExposure = THREE.MathUtils.lerp(moodFrom.exp, to.exp, e);
-  starMaterial.opacity = Math.max(0, uNight.value - 0.4) / 0.6;
+  for (const key in look) {
+    look[key] = typeof look[key] === 'number' ? THREE.MathUtils.lerp(moodFrom[key], moodTo[key], e) : look[key].copy(moodFrom[key]).lerp(moodTo[key], e);
+  }
   if (k >= 1) moodFrom = null;
+  return true;
+}
+
+// --- Rain: an overcast sky over any time of day, eased in and out ---
+let raining = false, rainFrom = 0, rainStart = -Infinity;
+const RAIN_EASE = 2.5, RAIN_FOG = [20, 58];
+function setRain(on) {
+  raining = on;
+  rainFrom = uRain.value;
+  rainStart = now();
+  const btn = document.getElementById('btn-rain');
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-pressed', String(on));
+  sfx.setRain(on ? 1 : 0);
+}
+function updateRain(t) {
+  const k = Math.min(1, (t - rainStart) / RAIN_EASE);
+  if (k >= 1 && uRain.value === +raining) return false;
+  uRain.value = THREE.MathUtils.lerp(rainFrom, +raining, k * k * (3 - 2 * k));
+  return true;
+}
+// Overcast colors keep their brightness but lose most of their hue to a cool grey
+const tmpColor = new THREE.Color();
+function overcast(out, c, r, dim) {
+  const l = (c.r * 0.3 + c.g * 0.59 + c.b * 0.11) * dim;
+  return out.copy(c).lerp(tmpColor.setRGB(l * 0.94, l * 0.98, l * 1.06), r * 0.8);
+}
+function applyLook() {
+  const r = uRain.value;
+  overcast(scene.background, look.bg, r, 0.85);
+  scene.fog.color.copy(scene.background);
+  // Rain pulls the fog in, but never past a mood that is already misty
+  scene.fog.near = Math.min(look.fog.x, THREE.MathUtils.lerp(look.fog.x, RAIN_FOG[0], r));
+  scene.fog.far = Math.min(look.fog.y, THREE.MathUtils.lerp(look.fog.y, RAIN_FOG[1], r));
+  overcast(hemi.color, look.sky, r, 0.95);
+  overcast(hemi.groundColor, look.ground, r, 0.9);
+  overcast(sun.color, look.sun, r, 1);
+  overcast(waterMaterial.color, look.water, r, 0.8);
+  hemi.intensity = look.hemi * (1 + 0.1 * r);
+  sun.intensity = look.sunI * (1 - 0.7 * r);
+  sun.position.copy(look.sunPos);
+  // A dark rainy day switches some lights on; clear-sky effects fade away
+  uNight.value = Math.max(look.night, 0.35 * r);
+  uRays.value = look.rays * (1 - r);
+  uDay.value = look.day * (1 - r);
+  uDusk.value = look.dusk * (1 - r);
+  renderer.toneMappingExposure = look.exp;
+  starMaterial.opacity = (Math.max(0, look.night - 0.4) / 0.6) * (1 - r);
 }
 
 // --- Ambient life: lighthouse beams, chimney smoke, boats, seagulls ---
@@ -542,6 +593,44 @@ function syncFireflies(list) {
   fireflies.geometry.dispose();
   fireflies.geometry = g;
 }
+
+// Rain streaks: short lines falling through a box that wraps around the camera target, one draw
+const RAIN_DROPS = 3000, RAIN_W = 44, RAIN_H = 24;
+const rainMaterial = new THREE.ShaderMaterial({
+  uniforms: { uTime, uRain, uCenter: { value: controls.target }, uColor: { value: new THREE.Color() } },
+  vertexShader: `attribute float aTop;
+uniform float uTime, uRain;
+uniform vec3 uCenter;
+varying float vA;
+void main() {
+  // Falls slightly slanted; the top end trails behind along the same slant
+  float y = mod(position.y - uTime * 13.0, ${RAIN_H.toFixed(1)}) - 0.5;
+  vec2 xz = mod(position.xz + vec2(0.2, 0.08) * y - uCenter.xz, ${RAIN_W.toFixed(1)}) - ${(RAIN_W / 2).toFixed(1)} + uCenter.xz;
+  vec3 p = vec3(xz.x, y, xz.y) + aTop * vec3(0.1, 0.55, 0.04);
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vA = (1.0 - aTop) * uRain * smoothstep(-0.5, 0.5, y) * (1.0 - smoothstep(${(RAIN_H - 5).toFixed(1)}, ${(RAIN_H - 1).toFixed(1)}, y)) * (1.0 - smoothstep(18.0, 45.0, -mv.z));
+  gl_Position = projectionMatrix * mv;
+}`,
+  fragmentShader: `uniform vec3 uColor;
+varying float vA;
+void main() { gl_FragColor = vec4(uColor, vA * 0.7); }`,
+  transparent: true, depthWrite: false,
+});
+const rainLines = new THREE.LineSegments(new THREE.BufferGeometry(), rainMaterial);
+{
+  const pos = [], top = [], r = mulberry32(11);
+  for (let i = 0; i < RAIN_DROPS; i++) {
+    const x = r() * RAIN_W, y = r() * RAIN_H, z = r() * RAIN_W;
+    pos.push(x, y, z, x, y, z);
+    top.push(0, 1);
+  }
+  rainLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  rainLines.geometry.setAttribute('aTop', new THREE.Float32BufferAttribute(top, 1));
+}
+rainLines.frustumCulled = false;
+rainLines.raycast = () => {};
+rainLines.visible = false;
+scene.add(rainLines);
 
 const SMOKE_MAX = 300;
 const smokeMesh = new THREE.InstancedMesh(
@@ -1401,6 +1490,7 @@ const buttons = {
   'btn-new': randomIsland,
   'btn-showcase': showcase,
   'btn-mood': () => setMood((moodIndex + 1) % MOODS.length),
+  'btn-rain': () => setRain(!raining),
   'btn-grid': toggleGrid,
   'btn-undo': undo,
   'btn-redo': redo,
@@ -1437,6 +1527,7 @@ addEventListener('keydown', (e) => {
   if (key === 'g') toggleGrid();
   if (key === 'h' || e.key === '?') setHelp(helpEl.classList.contains('hidden'));
   if (key === 'n') setMood((moodIndex + 1) % MOODS.length);
+  if (key === 'w') setRain(!raining);
   if (key === 'm') toggleMute();
   if (key === 's') share();
   if (key === 'p') screenshot();
@@ -1480,7 +1571,7 @@ renderer.setAnimationLoop(() => {
   }
   if (ghost) ghostMaterial.opacity = 0.35 + 0.15 * Math.sin(t * 6);
   updateTransitions(t);
-  updateMood(t);
+  if (updateMood(t) | updateRain(t)) applyLook();
   updateSmoke(t);
   updateBoats(t);
   updateGulls(t);
@@ -1488,7 +1579,9 @@ renderer.setAnimationLoop(() => {
   beam.value = (0.35 * Math.max(0, uNight.value - 0.2)) / 0.8;
   beamGroup.visible = beam.value > 0.002;
   halos.visible = glows.visible = uNight.value > 0.01;
-  fireflies.visible = uNight.value > 0.55;
+  fireflies.visible = uNight.value > 0.55 && uRain.value < 0.5;
+  rainLines.visible = uRain.value > 0.01;
+  rainMaterial.uniforms.uColor.value.copy(scene.background).lerp(hemi.color, 0.5).multiplyScalar(1.15);
   rays.visible = mist.visible = uRays.value > 0.01;
   mistMaterial.uniforms.uMistColor.value.copy(scene.background).lerp(sun.color, 0.25);
   uSunDir.value.copy(sun.position).normalize();
@@ -1512,5 +1605,5 @@ if ('serviceWorker' in navigator) {
 
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
-  undo, redo, setMood, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
+  undo, redo, setMood, setRain, encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
 };

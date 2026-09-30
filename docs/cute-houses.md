@@ -227,3 +227,13 @@ the original Townscaper.
  - A clean frame without the grid, hover preview or UI, with a white flash and a soft shutter sound.
  - Desktop downloads a PNG named by date and time; phones open the share sheet, so it can go
    straight to Photos.
+- 2026-09-30: rain, over any time of day (cloud button or W).
+ - Eases in over a few seconds: the sky, light and sea turn a cool grey, the fog comes a little
+   closer and some windows and lamps switch on, as on a dark afternoon.
+ - Thin slanted streaks fall around the camera target (one draw), and rings spread over the sea
+   where drops land.
+ - The town gets wet: slightly darker, with a sheen of sky on roofs at grazing angles.
+ - Cloud shadows, sea glints, sunset glitter, dawn shafts, stars and fireflies step aside.
+ - A soft rain hiss with sparse patter fades in over the surf.
+ - The mood blend now lives in its own state, and the weather is layered over it when both are
+   written to the scene.

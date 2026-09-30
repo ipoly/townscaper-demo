@@ -2,11 +2,13 @@
 // low filtered-noise surf in the background. No audio files needed.
 
 const SCALE = [0, 2, 4, 7, 9]; // major pentatonic, semitones
+const RAIN_GAIN = 0.05;
 
 export class Sfx {
   constructor() {
     this.ctx = null;
     this.muted = false;
+    this.rain = 0;
     this.lastPop = 0;
     // Go fully silent while the page is hidden (other app, locked screen, background tab).
     // The context is closed rather than suspended and only reopened by the next gesture: iOS
@@ -37,6 +39,7 @@ export class Sfx {
     this.master.connect(ctx.destination);
     this.lastPop = 0;
     this.startSurf();
+    this.startRain();
   }
 
   close() {
@@ -114,6 +117,38 @@ export class Sfx {
       osc.start(t + at);
       osc.stop(t + at + 0.1);
     }
+  }
+
+  // Rain: a soft hiss with sparse patter mixed in, faded in and out by setRain
+  startRain() {
+    const ctx = this.ctx;
+    const len = ctx.sampleRate * 3;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let drop = 0;
+    for (let i = 0; i < len; i++) {
+      if (Math.random() < 0.0012) drop = 0.6 + Math.random() * 0.8;
+      drop *= 0.996;
+      data[i] = (Math.random() * 2 - 1) * (0.25 + drop);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const high = ctx.createBiquadFilter();
+    high.type = 'highpass';
+    high.frequency.value = 900;
+    const low = ctx.createBiquadFilter();
+    low.type = 'lowpass';
+    low.frequency.value = 6000;
+    this.rainGain = ctx.createGain();
+    this.rainGain.gain.value = this.rain * RAIN_GAIN;
+    src.connect(high).connect(low).connect(this.rainGain).connect(this.master);
+    src.start();
+  }
+
+  setRain(level) {
+    this.rain = level;
+    if (this.ctx) this.rainGain.gain.setTargetAtTime(level * RAIN_GAIN, this.ctx.currentTime, 0.8);
   }
 
   // Brown noise through a lowpass, swelling slowly like waves
