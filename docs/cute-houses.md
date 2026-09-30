@@ -247,3 +247,12 @@ the original Townscaper.
    else, so waking never builds a block.
 - 2026-09-30: the town opens at the local time of day (dawn 5-8, day 8-17, dusk 17-20, night
   otherwise), set at once without a blend.
+- 2026-09-30: the splash and icons follow the town.
+ - The splash shows the sky of the time of day the town opens at (a tiny inline script reads the
+   clock before anything is drawn; main.js starts from the same mood), and the browser theme
+   color follows every change of time.
+ - App icon redrawn: the two houses now stand on wooden stilts over the sea, with foam, soft
+   reflections and a seagull. The maskable icon keeps the sea full-bleed and shrinks only the
+   houses into the safe zone.
+ - New small favicon: one house on stilts with a big window, readable at 16 px. The tab icon is
+   recolored with the time of day, its window lit at dusk and night.

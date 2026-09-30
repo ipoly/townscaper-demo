@@ -11,6 +11,7 @@ const CORE = [
   './audio.js',
   './manifest.webmanifest',
   './icons/icon.svg',
+  './icons/favicon.svg',
   './icons/icon-192.png',
   THREE_BASE + 'build/three.module.js',
   THREE_BASE + 'examples/jsm/controls/OrbitControls.js',

@@ -249,6 +249,33 @@ function setMood(i, ease = 1.6) {
   for (const svg of btn.querySelectorAll('svg')) svg.toggleAttribute('hidden', svg.dataset.mood !== MOODS[i].name);
   btn.dataset.tip = `${MOODS[i].name} · switch to ${MOODS[(i + 1) % MOODS.length].name} (N)`;
   document.body.classList.toggle('dark', MOODS[i].night > 0.7);
+  themeColorEl.content = MOODS[i].bg;
+  syncFavicon(MOODS[i].name);
+}
+// The tab icon follows the time of day too: sky, sea, window, wall and roof recolored, the window lit at dusk and night
+const themeColorEl = document.querySelector('meta[name="theme-color"]');
+const faviconEl = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+const faviconPngEl = document.querySelector('link[rel="icon"][type="image/png"]');
+const faviconSvg = fetch(faviconEl.href).then((r) => r.text()).catch(() => null);
+const FAVICON_DAY = ['#e8f5f6', '#bfe3ea', '#5aa6c4', '#34424f', '#fcc28d', '#af3d36'];
+const FAVICON = {
+  Dusk: ['#ffd0a8', '#f0b48e', '#6b8fb2', '#ffc861', '#f0a878', '#9c3432'],
+  Night: ['#34406a', '#1c2744', '#1f3654', '#ffc861', '#8a7080', '#5e2c3c'],
+  Dawn: ['#f2e2f2', '#e6d4de', '#8fb2c9', '#34424f', '#fcc28d', '#af3d36'],
+};
+async function syncFavicon(name) {
+  const svg = await faviconSvg;
+  if (!svg) return;
+  const colors = FAVICON[name] ?? FAVICON_DAY;
+  const url = 'data:image/svg+xml,' + encodeURIComponent(FAVICON_DAY.reduce((out, c, i) => out.replaceAll(c, colors[i]), svg));
+  faviconEl.href = url;
+  // Browsers that pick the PNG fallback get the same picture, drawn from the SVG
+  const img = new Image();
+  img.src = url;
+  try { await img.decode(); } catch { return; }
+  const canvas = Object.assign(document.createElement('canvas'), { width: 32, height: 32 });
+  canvas.getContext('2d').drawImage(img, 0, 0, 32, 32);
+  faviconPngEl.href = canvas.toDataURL();
 }
 function updateMood(t) {
   if (!moodFrom) return false;
@@ -1612,11 +1639,8 @@ addEventListener('resize', () => {
 });
 
 if (!loadFromHash()) newWorld(42, showcaseTown);
-// Open at the local time of day: dawn 5-8, day 8-17, dusk 17-20, night otherwise
-{
-  const h = new Date().getHours();
-  setMood(h >= 5 && h < 8 ? 3 : h >= 8 && h < 17 ? 0 : h >= 17 && h < 20 ? 1 : 2, 0);
-}
+// Open at the local time of day, picked by the inline script in index.html
+setMood(Math.max(0, MOODS.findIndex((m) => m.name === document.documentElement.dataset.mood)), 0);
 // Ambient motion is slow, so after a few idle seconds 30fps looks the same and saves battery.
 // Any input or camera movement brings back the full frame rate immediately.
 const IDLE_AFTER = 3, IDLE_FRAME = 1 / 30;
