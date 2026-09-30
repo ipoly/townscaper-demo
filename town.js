@@ -1885,6 +1885,11 @@ export class Town {
         noOutline = true;
         quad(p3(C[i], POND_Y), p3(M[i], POND_Y), p3(Q, POND_Y), p3(M[p], POND_Y), [0, 1, 0], POND_COLORS[P.type], pm);
         noOutline = false;
+        // Fireflies gather over most of the pond water at night
+        if (hash(v, quadId, 81) < 0.8) {
+          const f = lerp2(C[i], Q, 0.5);
+          R.fx.flies.push({ x: f[0], y: POND_Y, z: f[1], born: P.b });
+        }
         const r = (k) => hash(v, k, 71);
         const reedy = P.type === 'lily' || P.type === 'lagoon';
         if (reedy && (this.has(q[(i + 1) % 4], 0) || this.has(q[p], 0)) && hash(v, quadId, 72) < 0.55) {
@@ -2217,7 +2222,7 @@ export class Town {
         const cached = this.cache.get(q);
         if (cached && cached.sig === sig) return cached;
       }
-      R = { position: [], normal: [], color: [], aPivot: [], aBorn: [], aGlow: [], aWave: [], normals: [], edgeless: [], meta: [], fx: { smoke: [], lamps: [], boats: [], halos: [], glows: [] } };
+      R = { position: [], normal: [], color: [], aPivot: [], aBorn: [], aGlow: [], aWave: [], normals: [], edgeless: [], meta: [], fx: { smoke: [], lamps: [], boats: [], halos: [], glows: [], flies: [] } };
       emitQuad(q);
       const rec = this.finishRecord(R, q, cosT);
       rec.sig = sig;
@@ -2225,7 +2230,7 @@ export class Town {
       return rec;
     });
     if (useCache) this.records = records;
-    const fx = { smoke: [], lamps: [], boats: [], halos: [], glows: [] };
+    const fx = { smoke: [], lamps: [], boats: [], halos: [], glows: [], flies: [] };
     for (const r of records) for (const key in fx) fx[key].push(...r.fx[key]);
     return { recOf: new Map(quads.map((q, i) => [q, records[i]])), fx };
   }

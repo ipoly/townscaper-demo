@@ -201,3 +201,8 @@ the original Townscaper.
    pearly water, a nearer fog for morning mist, and lit windows at a faint 15% glow.
  - Fog near and far are now part of each mood and blend with it (default 30 and 70).
  - The dusk icon is now a setting sun; dawn uses the rising sun.
+- 2026-09-30: dawn light shafts and pond fireflies.
+ - Dawn: nine long soft strips slant in from the sun over the town's footprint, turned to face the
+   camera around their own axis and slowly shimmering. Buildings in front still hide them.
+ - Night: fireflies wander and blink over most pond water, three per spot, fading in with the night.
+ - Both are a single draw each, animated in the vertex shader, with no full-screen pass.

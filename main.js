@@ -41,6 +41,7 @@ const now = () => performance.now() / 1000;
 let lastActive = now(); // last input, camera move or town change
 const uTime = { value: now() };
 const uNight = { value: 0 };
+const uRays = { value: 0 }; // dawn light shafts
 
 // Low-poly water: vertices bob in the shader (local z is up), flat shading turns that into facets
 const waterMaterial = new THREE.MeshStandardMaterial({ color: '#5aa6c4', roughness: 0.35, metalness: 0.1, flatShading: true });
@@ -140,7 +141,7 @@ const MOODS = [
   { name: 'Dusk', bg: '#f0b48e', sky: '#ffd0a8', ground: '#5a6f8f', hemi: 1.0, sun: '#ff9458', sunI: 1.7, sunPos: [20, 6, 2], water: '#6b8fb2', night: 0.45, exp: 1.2 },
   { name: 'Night', bg: '#1c2744', sky: '#8492c4', ground: '#26324c', hemi: 1.0, sun: '#aabcff', sunI: 0.7, sunPos: [-10, 18, -6], water: '#1f3654', night: 1, exp: 0.95 },
   // Cool pastel light from the side opposite dusk, a thin mist and a few windows still lit
-  { name: 'Dawn', bg: '#e6d4de', sky: '#f2e2f2', ground: '#8a90ad', hemi: 1.25, sun: '#ffc6a0', sunI: 1.5, sunPos: [-18, 6, 6], water: '#8fb2c9', night: 0.15, exp: 1.25, fog: [16, 55] },
+  { name: 'Dawn', bg: '#e6d4de', sky: '#f2e2f2', ground: '#8a90ad', hemi: 1.25, sun: '#ffc6a0', sunI: 1.5, sunPos: [-18, 6, 6], water: '#8fb2c9', night: 0.15, exp: 1.25, fog: [16, 55], rays: 1 },
 ];
 const FOG = [30, 70];
 let moodIndex = 0, moodFrom = null, moodStart = 0;
@@ -150,7 +151,7 @@ const moodTo = {
   sunPos: new THREE.Vector3(),
 };
 const snapshotMood = () => ({
-  fog: new THREE.Vector2(scene.fog.near, scene.fog.far), bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
+  fog: new THREE.Vector2(scene.fog.near, scene.fog.far), rays: uRays.value, bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
   water: waterMaterial.color.clone(), hemi: hemi.intensity, sunI: sun.intensity, sunPos: sun.position.clone(), night: uNight.value, exp: renderer.toneMappingExposure,
 });
 function setMood(i) {
@@ -180,6 +181,7 @@ function updateMood(t) {
   sun.intensity = THREE.MathUtils.lerp(moodFrom.sunI, to.sunI, e);
   sun.position.copy(moodFrom.sunPos).lerp(moodTo.sunPos.fromArray(to.sunPos), e);
   uNight.value = THREE.MathUtils.lerp(moodFrom.night, to.night, e);
+  uRays.value = THREE.MathUtils.lerp(moodFrom.rays, to.rays ?? 0, e);
   renderer.toneMappingExposure = THREE.MathUtils.lerp(moodFrom.exp, to.exp, e);
   starMaterial.opacity = Math.max(0, uNight.value - 0.4) / 0.6;
   if (k >= 1) moodFrom = null;
@@ -306,6 +308,110 @@ function syncHalos(list, lampList) {
   p.setAttribute('aBorn', new THREE.Float32BufferAttribute(lampList.map((l) => l.born), 1));
   glows.geometry.dispose();
   glows.geometry = p;
+}
+
+// --- Dawn light shafts: long soft strips slanting in from the sun, turned to face the camera ---
+const RAY_COUNT = 9, RAY_LENGTH = 16;
+const uSunDir = { value: new THREE.Vector3() };
+const rayMaterial = new THREE.ShaderMaterial({
+  uniforms: { uTime, uRays, uSunDir },
+  vertexShader: `attribute vec2 aCorner; attribute vec2 aSeed;
+uniform float uTime, uRays; uniform vec3 uSunDir;
+varying vec2 vCorner; varying float vFade;
+void main() {
+  // aCorner.x is the side (-1..1), aCorner.y runs from the ground (0) up towards the sun (1)
+  vec3 p = position + uSunDir * aCorner.y * ${RAY_LENGTH.toFixed(1)};
+  vec3 side = normalize(cross(uSunDir, cameraPosition - p));
+  float width = mix(0.35, 0.9, aSeed.x) * (1.0 + aCorner.y * 0.6);
+  p += side * aCorner.x * width;
+  vCorner = aCorner;
+  vFade = uRays * (0.55 + 0.45 * sin(uTime * 0.35 + aSeed.y * 6.28));
+  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+}`,
+  fragmentShader: `varying vec2 vCorner; varying float vFade;
+void main() {
+  float across = 1.0 - vCorner.x * vCorner.x;
+  float along = smoothstep(0.0, 0.15, vCorner.y) * (1.0 - smoothstep(0.35, 1.0, vCorner.y));
+  gl_FragColor = vec4(vec3(1.0, 0.9, 0.74) * across * across * along * vFade * 0.16, 1.0);
+}`,
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+});
+const rays = new THREE.Mesh(new THREE.BufferGeometry(), rayMaterial);
+rays.frustumCulled = false;
+rays.raycast = () => {};
+scene.add(rays);
+const townBox = new THREE.Box3();
+
+// Shafts land at fixed pseudo-random spots over the town's footprint
+function syncRays() {
+  townBox.setFromObject(townGroup);
+  if (townBox.isEmpty()) townBox.set(new THREE.Vector3(-4, 0, -4), new THREE.Vector3(4, 0, 4));
+  const pos = [], corner = [], seed = [], index = [];
+  for (let i = 0; i < RAY_COUNT; i++) {
+    const r = (k) => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+    const x = THREE.MathUtils.lerp(townBox.min.x, townBox.max.x, r(1)), z = THREE.MathUtils.lerp(townBox.min.z, townBox.max.z, r(2));
+    const base = pos.length / 3;
+    for (const [sx, t] of [[-1, 0], [1, 0], [1, 1], [-1, 1]]) {
+      pos.push(x, 0, z);
+      corner.push(sx, t);
+      seed.push(r(3), r(4));
+    }
+    index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aCorner', new THREE.Float32BufferAttribute(corner, 2));
+  g.setAttribute('aSeed', new THREE.Float32BufferAttribute(seed, 2));
+  g.setIndex(index);
+  rays.geometry.dispose();
+  rays.geometry = g;
+}
+
+// --- Fireflies: small blinking points wandering over the ponds at night ---
+const FLIES_PER_SPOT = 3;
+const fireflyMaterial = new THREE.ShaderMaterial({
+  uniforms: { uTime, uNight, uScale: glowMaterial.uniforms.uScale },
+  vertexShader: `attribute float aBorn; attribute vec3 aSeed;
+uniform float uTime, uNight, uScale;
+varying float vFade;
+void main() {
+  float t = uTime * (0.5 + 0.4 * aSeed.x) + aSeed.y * 6.28;
+  vec3 p = position + vec3(sin(t * 1.3) * 0.28, 0.12 + 0.3 * (0.5 + 0.5 * sin(t * 0.7 + aSeed.z * 6.28)), cos(t * 1.1 + aSeed.z * 3.0) * 0.28);
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_PointSize = 0.24 * uScale * projectionMatrix[1][1] / -mv.z;
+  float blink = pow(0.5 + 0.5 * sin(uTime * (1.2 + aSeed.z) + aSeed.x * 20.0), 3.0);
+  vFade = smoothstep(0.55, 0.95, uNight) * smoothstep(aBorn + 0.6, aBorn + 1.4, uTime) * (0.15 + 0.85 * blink);
+  gl_Position = projectionMatrix * mv;
+}`,
+  fragmentShader: `varying float vFade;
+void main() {
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  float a = pow(max(0.0, 1.0 - d), 2.0) + 0.8 * (1.0 - smoothstep(0.1, 0.25, d));
+  gl_FragColor = vec4(vec3(0.78, 1.0, 0.42) * a * vFade, 1.0);
+}`,
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const fireflies = new THREE.Points(new THREE.BufferGeometry(), fireflyMaterial);
+fireflies.frustumCulled = false;
+fireflies.raycast = () => {};
+scene.add(fireflies);
+
+function syncFireflies(list) {
+  const pos = [], seed = [], born = [];
+  list.forEach((f, i) => {
+    for (let k = 0; k < FLIES_PER_SPOT; k++) {
+      const r = (j) => { const x = Math.sin((i * FLIES_PER_SPOT + k) * 91.7 + j * 47.3 + f.x * 13.1) * 43758.5453; return x - Math.floor(x); };
+      pos.push(f.x + (r(1) - 0.5) * 0.3, f.y, f.z + (r(2) - 0.5) * 0.3);
+      seed.push(r(3), r(4), r(5));
+      born.push(f.born);
+    }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aSeed', new THREE.Float32BufferAttribute(seed, 3));
+  g.setAttribute('aBorn', new THREE.Float32BufferAttribute(born, 1));
+  fireflies.geometry.dispose();
+  fireflies.geometry = g;
 }
 
 const SMOKE_MAX = 300;
@@ -596,6 +702,8 @@ function rebuild() {
   chimneys = built.fx.smoke;
   syncBeams(built.fx.lamps);
   syncHalos(built.fx.halos, built.fx.glows);
+  syncFireflies(built.fx.flies);
+  syncRays();
   syncBoats(built.fx.boats);
 }
 
@@ -1211,6 +1319,9 @@ renderer.setAnimationLoop(() => {
   beam.value = (0.35 * Math.max(0, uNight.value - 0.2)) / 0.8;
   beamGroup.visible = beam.value > 0.002;
   halos.visible = glows.visible = uNight.value > 0.01;
+  fireflies.visible = uNight.value > 0.55;
+  rays.visible = uRays.value > 0.01;
+  uSunDir.value.copy(sun.position).normalize();
   for (const l of lamps) {
     l.g.rotation.y = t * 0.8 + l.phase;
     l.g.scale.setScalar(Math.min(1, Math.max(0.001, (t - l.born - 0.4) / 0.6)));
