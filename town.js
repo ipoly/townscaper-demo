@@ -13,7 +13,10 @@ export const MAX_LEVEL = 10;
 const BASE_BOTTOM = -0.4;
 const BASE_TOP = 0.3;
 const LEVEL_H = 0.85;
-const ROOF_RISE = 0.45;
+const ROOF_RISE = 0.6;
+const EAVE = 0.09; // how far roofs overhang the walls
+const EAVE_DROP = 0.07;
+const EAVE_RIM = 0.04;
 const SPIRE_RISE = 1.3;
 const ARCH_RISE = 0.4;
 const DECK = 0.24;
@@ -986,6 +989,51 @@ export class Town {
       if (flower) blob([c2[0], y + 0.03, c2[1]], 0.03, 0.8, BLOSSOM, m);
     };
 
+    // Overhanging eaves where roof quadrant i meets an outer wall: a thick wedge carrying the
+    // slope out past the wall. At the edge midpoint a strip ends where the neighbouring quad's
+    // strip starts; at the quad center it meets the next wall's strip on their mitred line.
+    // eaved[k]: quadrant k gets eaves too, otherwise the open end of the wedge is capped.
+    const eaves = (i, C, M, Q, occ, eaved, y, color, m) => {
+      const unit = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+      // Wall segment k (between quadrants k and k+1) offset by EAVE towards its empty side
+      const line = (k) => {
+        const d = unit(Q, M[k]), c = C[occ[k] ? (k + 1) % 4 : k];
+        let nrm = [-d[1], d[0]];
+        if ((c[0] - Q[0]) * nrm[0] + (c[1] - Q[1]) * nrm[1] < 0) nrm = [-nrm[0], -nrm[1]];
+        return { p: [Q[0] + nrm[0] * EAVE, Q[1] + nrm[1] * EAVE], d, nrm };
+      };
+      const meet = (l1, l2) => {
+        const det = l1.d[0] * l2.d[1] - l1.d[1] * l2.d[0];
+        if (Math.abs(det) < 0.15) return null;
+        const t = ((l2.p[0] - l1.p[0]) * l2.d[1] - (l2.p[1] - l1.p[1]) * l2.d[0]) / det;
+        const x = [l1.p[0] + l1.d[0] * t, l1.p[1] + l1.d[1] * t];
+        return Math.hypot(x[0] - Q[0], x[1] - Q[1]) < EAVE * 3 ? x : null;
+      };
+      const segs = [0, 1, 2, 3].filter((k) => occ[k] !== occ[(k + 1) % 4]);
+      const yo = y - EAVE_DROP, yb = yo - EAVE_RIM;
+      const shade = color.clone().multiplyScalar(0.55);
+      for (const [k, j] of [[i, (i + 1) % 4], [(i + 3) % 4, (i + 3) % 4]]) {
+        if (occ[j]) continue;
+        const own = line(k);
+        // Checkerboard corners have four walls at the center: no single partner to mitre with
+        const other = segs.length === 2 ? segs.find((s) => s !== k) : null;
+        const qo = (other != null && meet(own, line(other))) || own.p;
+        const md = unit(C[i], C[j]);
+        const mo = [M[k][0] + md[0] * EAVE, M[k][1] + md[1] * EAVE];
+        const out = [own.nrm[0], 0, own.nrm[1]];
+        quad(p3(M[k], y), p3(Q, y), p3(qo, yo), p3(mo, yo), [0, 1, 0], color, m);
+        quad(p3(mo, yo), p3(qo, yo), p3(qo, yb), p3(mo, yb), out, color, m);
+        noOutline = true;
+        quad(p3(M[k], y), p3(Q, y), p3(qo, yb), p3(mo, yb), [0, -1, 0], shade, m);
+        noOutline = false;
+        const partner = other == null ? -1 : occ[other] ? other : (other + 1) % 4;
+        if (partner < 0 || !eaved[partner]) {
+          const along = unit(M[k], Q);
+          tri(p3(Q, y), p3(qo, yo), p3(qo, yb), [along[0], 0, along[1]], color, m);
+        }
+      }
+    };
+
     // Dormer on a roof slope at c2 whose roof height is y, facing dir
     const dormer = (c2, y, dir, color, m) => {
       box(c2, y - 0.12, y + 0.16, 0.09, dir, color, m);
@@ -1346,24 +1394,34 @@ export class Town {
         if (h < 0.5) rect(0.42, 0.58, 0.32, 0.5, WINDOW);
         return;
       }
-      // Same as slab, but in the half-wall's own t coordinates
-      const S = (t0, t1, yA, yB, d, c) => {
-        const u0 = tm(t0), u1 = tm(t1);
-        slab(Math.min(u0, u1), Math.max(u0, u1), d, yA, yB, c);
+      // Windows are centered on the whole face: this half draws u = 0..w and the neighbouring
+      // half-wall the mirror image. Sizes are in world units so both halves match.
+      const U = (x) => Math.min(0.7, x / len);
+      const FRAME = 0.045;
+      // Fan around the face center at height yc, angles a0..a1 (u = cos * r, y = sin * r)
+      const fan = (yc, r, a0, a1, off, c) => {
+        const pt = (a) => p3(at(tm(Math.max(0, Math.cos(a) * r) / len), off), yc + Math.sin(a) * r);
+        const c0 = p3(at(tm(0), off), yc);
+        for (let k = 0; k < 6; k++) tri(c0, pt(a0 + ((a1 - a0) * k) / 6), pt(a0 + ((a1 - a0) * (k + 1)) / 6), towards, c, m);
       };
-      // Window: glass set back behind jambs, lintel and sill, with optional glazing bars
-      const pane = (t0, t1, h0, h1, bars = true) => {
-        const yA = y0 + h0, yB = y0 + h1, f = 0.035;
-        rect(t0, t1, h0, h1, WINDOW, 0.004);
-        if (bars) {
-          const tc = (t0 + t1) / 2, hb = h0 + (h1 - h0) * 0.58;
-          rect(tc - 0.012, tc + 0.012, h0, h1, WHITE, 0.008);
-          rect(t0, t1, hb - 0.01, hb + 0.01, WHITE, 0.008);
+      // Big window with a chunky frame, optionally round-arched; hw is its half width
+      const window1 = (hw, h0, h1, round = false) => {
+        const w = U(hw), f = U(FRAME), yA = y0 + h0, yB = y0 + h1;
+        const ys = round ? yB - hw : yB; // springline of the arch
+        rect(tm(0), tm(w), h0, ys - y0, WINDOW, 0.004);
+        slab(w, w + f, 0.035, yA, ys, WHITE);
+        slab(0, w + f + U(0.02), 0.06, yA - FRAME, yA, WHITE); // sill
+        if (!round) {
+          slab(0, w + f, 0.04, yB, yB + FRAME, WHITE);
+          return;
         }
-        S(t0 - f, t0, yA, yB, 0.025, WHITE);
-        S(t1, t1 + f, yA, yB, 0.025, WHITE);
-        S(t0 - f, t1 + f, yB, yB + 0.035, 0.03, WHITE);
-        S(t0 - f - 0.02, t1 + f + 0.02, yA - 0.035, yA, 0.055, WHITE);
+        fan(ys, hw + FRAME, 0, Math.PI / 2, 0.008, WHITE);
+        fan(ys, hw, 0, Math.PI / 2, 0.012, WINDOW);
+      };
+      // Round window: this half draws its half disc
+      const porthole = (r, hc) => {
+        fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, WHITE);
+        fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, WINDOW);
       };
       // Door leaf u0..u1 (u = 0 at the edge midpoint); starting at 0 it is one wing of a double
       // door centered on the face, whose other wing comes from the neighbouring half-wall
@@ -1422,7 +1480,7 @@ export class Town {
       }
       if (L >= 2 && this.has(target, L - 1) && !this.has(target, L) && infoOf(target, L - 1).info.tr) {
         // French door out onto the neighbour's roof terrace
-        pane(0.34, 0.66, 0.03, 0.62);
+        window1(0.14, 0.03, 0.62);
         return;
       }
       if (L === 2 && this.hasStair(v, target) && !aIsM) {
@@ -1435,51 +1493,36 @@ export class Town {
         door(0, 0.2, pickFrom(DOORS, hash(v, target, 3)));
         return;
       }
-      if (h < 0.12) return; // blank wall
-      if (h < 0.38) {
-        pane(0.34, 0.66, 0.26, 0.62);
-      } else if (h < 0.52) {
-        pane(0.38, 0.62, 0.14, 0.64);
-      } else if (h < 0.68) {
-        const sc = pickFrom(SHUTTERS, hash(v, L, 11));
-        pane(0.37, 0.63, 0.26, 0.6);
-        S(0.2, 0.32, y0 + 0.25, y0 + 0.61, 0.02, sc);
-        S(0.68, 0.8, y0 + 0.25, y0 + 0.61, 0.02, sc);
-      } else if (h < 0.8) {
-        // Round-arched window
-        const t0 = 0.36, t1 = 0.64, hs = 0.46, f = 0.035;
-        const r = ((t1 - t0) / 2) * len;
-        rect(t0, t1, 0.2, hs, WINDOW, 0.004);
-        S(t0 - f, t0, y0 + 0.2, y0 + hs, 0.025, WHITE);
-        S(t1, t1 + f, y0 + 0.2, y0 + hs, 0.025, WHITE);
-        S(t0 - f - 0.02, t1 + f + 0.02, y0 + 0.165, y0 + 0.2, 0.055, WHITE);
-        const c1 = p3(at(0.5, 0.012), y0 + hs);
-        const arc = (k, rr, off) => { const ang = (k / 8) * Math.PI; return p3(at(0.5 + (Math.cos(ang) * rr) / len, off), y0 + hs + Math.sin(ang) * rr); };
-        for (let k = 0; k < 8; k++) {
-          tri(c1, arc(k, r + f * len, 0.012), arc(k + 1, r + f * len, 0.012), towards, WHITE, m);
-          tri(c1, arc(k, r, 0.016), arc(k + 1, r, 0.016), towards, WINDOW, m);
-        }
-      } else if (h < 0.9 && L >= 2) {
-        // Balcony: French window, thick slab on two brackets, balustrade, sometimes a pot
+      if (h < 0.1) return; // blank wall
+      if (h < 0.42) {
+        window1(0.15, 0.24, 0.62);
+      } else if (h < 0.62) {
+        window1(0.14, 0.22, 0.64, true);
+      } else if (h < 0.76) {
+        const sc = pickFrom(SHUTTERS, hash(v, L, 11)), w = U(0.13) + U(0.045);
+        window1(0.13, 0.26, 0.6);
+        slab(w + U(0.015), w + U(0.12), 0.02, y0 + 0.25, y0 + 0.61, sc);
+      } else if (h < 0.86 && L >= 2) {
+        // Balcony: French window, thick slab on brackets, balustrade, sometimes a pot
         const iron = hash(v, L, target, 13) < 0.45;
-        const rc = iron ? SLATE : WHITE, d = 0.2;
-        pane(0.37, 0.63, 0.04, 0.62);
-        S(0.2, 0.8, y0 - 0.02, y0 + 0.035, d, WHITE);
-        for (const t of [0.27, 0.73]) S(t - 0.025, t + 0.025, y0 - 0.14, y0 - 0.02, d * 0.6, WHITE);
+        const rc = iron ? SLATE : WHITE, d = 0.2, w = U(0.3);
+        window1(0.13, 0.04, 0.62);
+        slab(0, w, d, y0 - 0.02, y0 + 0.035, WHITE);
+        slab(U(0.17), U(0.22), d * 0.6, y0 - 0.14, y0 - 0.02, WHITE);
         const yr = y0 + 0.24, dir = dirAlong();
-        const front = (t) => at(t, d - 0.02);
-        bar(p3(front(0.215), yr), p3(front(0.785), yr), 0.013, rc, m);
-        for (const t of [0.215, 0.785]) bar(p3(at(t, 0), yr), p3(front(t), yr), 0.013, rc, m);
-        for (let k = 0; k <= 6; k++) box(front(0.215 + k * 0.095), y0 + 0.035, yr, iron ? 0.006 : 0.013, dir, rc, m);
-        for (const t of [0.215, 0.785]) box(at(t, d * 0.5), y0 + 0.035, yr, iron ? 0.006 : 0.013, dir, rc, m);
-        if (hash(v, L, target, 14) < 0.5) {
-          const pos = at(hash(v, L, target, 15) < 0.5 ? 0.3 : 0.7, 0.1);
-          prism(pos, 0.035, y0 + 0.035, y0 + 0.1, 6, TERRACOTTA, m);
-          blob([pos[0], y0 + 0.14, pos[1]], 0.05, 1, pickFrom(BLOOMS, hash(v, L, target, 16)), m);
+        const front = (u) => at(tm(u), d - 0.02);
+        const wr = w - U(0.015);
+        bar(p3(front(0), yr), p3(front(wr), yr), 0.016, rc, m);
+        bar(p3(at(tm(wr), 0), yr), p3(front(wr), yr), 0.016, rc, m);
+        for (let k = 1; k <= 3; k++) box(front((wr * k) / 3), y0 + 0.035, yr, iron ? 0.008 : 0.016, dir, rc, m);
+        box(at(tm(wr), d * 0.5), y0 + 0.035, yr, iron ? 0.008 : 0.016, dir, rc, m);
+        if (aIsM && hash(v, L, target, 14) < 0.5) {
+          const pos = at(tm(w * 0.6), 0.1);
+          prism(pos, 0.04, y0 + 0.035, y0 + 0.11, 6, TERRACOTTA, m);
+          blob([pos[0], y0 + 0.16, pos[1]], 0.06, 1, pickFrom(BLOOMS, hash(v, L, target, 16)), m);
         }
       } else {
-        pane(0.2, 0.42, 0.3, 0.58, false);
-        pane(0.58, 0.8, 0.3, 0.58, false);
+        porthole(0.12, 0.44);
       }
     };
 
@@ -1551,6 +1594,7 @@ export class Town {
         const firstRidge = ridge.indexOf(true);
         // Covered porch under a block hovering over the column
         const porch = inf.map((I, i) => top[i] && !br[i] && !I.tr && !!I.cv && L > 0 && styleOf(I) === 'normal');
+        const eaved = inf.map((I, i) => ridge[i] && L > 0 && I.r > 0 && !I.lt);
 
         for (let i = 0; i < 4; i++) {
           if (!occ[i]) continue;
@@ -1609,6 +1653,7 @@ export class Town {
               color = ROOFS[I.rc ?? I.ci];
             }
             quad(p3(C[i], hC), p3(M[i], hN), p3(Q, hQ), p3(M[p], hP), [0, 1, 0], color, topMeta);
+            if (eaved[i]) eaves(i, C, M, Q, occ, eaved, yt, color, topMeta);
 
             if (firstQuad && I.lt) lighthouseTop(C[i], hC, topMeta);
             const isRow = I.ut === 'row';

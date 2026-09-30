@@ -113,7 +113,7 @@ const townMaterial = withPop(new THREE.MeshStandardMaterial({
   polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
 }), { glow: true });
 const townDepthMaterial = withPop(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
-const outlineMaterial = withPop(new THREE.LineBasicMaterial({ color: '#2e2a28', transparent: true, opacity: 0.6 }));
+const outlineMaterial = withPop(new THREE.LineBasicMaterial({ color: '#6b5446', transparent: true, opacity: 0.3 }));
 const ghostMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45, depthWrite: false });
 
 // --- Day / dusk / night ---
