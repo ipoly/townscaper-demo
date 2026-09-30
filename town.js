@@ -1642,6 +1642,20 @@ export class Town {
         const shaded = facesPlaza && hash(v, target, 8) < 0.55;
         door(0, 0.2, pickFrom(DOORS, hash(v, target, 3)), !shaded && hash(v, target, 10) < 0.6);
         if (shaded) awning(0.29, y0 + 0.66, y0 + 0.54, 0.2, pickFrom(UMBRELLAS.slice(0, 3), hash(v, target, 9)));
+        // Potted shrub on the ground beside some plaza doors, past the doorstep
+        if (facesPlaza && L === 1 && hash(v, target, 25) < 0.45) {
+          const pos = at(tm(Math.min(0.9, 0.28 + U(0.07))), 0.1), fl = hash(v, target, 26) < 0.5;
+          prism(pos, 0.045, y0, y0 + 0.08, 6, TERRACOTTA, m);
+          prism(pos, 0.055, y0 + 0.08, y0 + 0.105, 6, TERRACOTTA, m);
+          blob([pos[0], y0 + 0.16, pos[1]], 0.07, 1, pickFrom(LEAVES, hash(v, target, 27)), m);
+          if (fl) {
+            const bloom = pickFrom(BLOOMS, hash(v, target, 28));
+            for (let k = 0; k < 3; k++) {
+              const a = (k / 3) * Math.PI * 2 + hash(v, target, 29) * 6;
+              blob([pos[0] + Math.cos(a) * 0.045, y0 + 0.19, pos[1] + Math.sin(a) * 0.045], 0.025, 1, bloom, m);
+            }
+          }
+        }
         return;
       }
       // Bushes at the foot of walls that face a lawn or a square

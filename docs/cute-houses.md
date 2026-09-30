@@ -56,6 +56,11 @@ the original Townscaper.
 - [x] Tied-back curtains in some windows
 - [x] Ivy climbing some ground-floor walls
 
+### Phase 7: softer smoke and door pots
+
+- [x] Round, smooth white smoke puffs instead of grey faceted balls
+- [x] Potted shrubs beside some plaza doors
+
 ## Progress log
 
 - 2026-09-30: diagnosis done; starting phase 1 items 1-3.
@@ -125,3 +130,8 @@ the original Townscaper.
    taller wall the C -> Q line lies flat on the slope, so the caps there stuck out past the eave
    (crossing in an X between two roofs, or poking out beside a taller neighbour). The eave tip is
    also skipped when the diagonal quadrant is built.
+- 2026-09-30: phase 7 done.
+ - Smoke: puffs use a smoother icosphere and a white, slightly emissive material; they start small,
+   swell and shrink away as they drift off, so they no longer read as floating rocks.
+ - Door pots: ~45% of the ground-floor plaza door halves get a terracotta pot with a round shrub past
+   the doorstep, half of them with a few blooms.

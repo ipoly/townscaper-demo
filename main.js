@@ -189,8 +189,8 @@ function syncBeams(list) {
 
 const SMOKE_MAX = 300;
 const smokeMesh = new THREE.InstancedMesh(
-  new THREE.IcosahedronGeometry(1, 0),
-  new THREE.MeshStandardMaterial({ color: '#ece8e2', flatShading: true, roughness: 1, transparent: true, opacity: 0.85 }),
+  new THREE.IcosahedronGeometry(1, 2),
+  new THREE.MeshStandardMaterial({ color: '#fbfaf7', emissive: '#6a6864', roughness: 1, transparent: true, opacity: 0.8 }),
   SMOKE_MAX,
 );
 smokeMesh.count = 0;
@@ -216,7 +216,8 @@ function updateSmoke(t) {
     const p = puffs[i];
     const a = (t - p.t0) / 3.2;
     if (a >= 1) { puffs.splice(i, 1); continue; }
-    const s = 0.05 + 0.13 * Math.sin(Math.PI * Math.min(1, a * 1.3));
+    // Small round puffs that swell, then shrink away as they drift off
+    const s = 0.04 + 0.09 * Math.sin(Math.PI * Math.min(1, a * 1.15));
     tmpPos.set(p.x + a * 0.6, p.y + 0.05 + a * 1.4, p.z + a * 0.25);
     tmpQuat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, p.spin + a * 2);
     tmpScale.setScalar(Math.max(s, 0.001));
