@@ -22,8 +22,8 @@ const ARCH_RISE = 0.4;
 const DECK = 0.24;
 const POND_Y = 0.12;
 
-export const PALETTE = ['#f4d9b0', '#e9a47c', '#f6ece6', '#bfe0e6', '#e58368', '#8fd0c9', '#f5f0c8', '#a9c7a0', '#f2b84b'];
-const ROOF_OF = ['#c4553e', '#a8452f', '#5a6b85', '#4e5f78', '#b84a36', '#3f7f73', '#c4553e', '#5b7a4e', '#8a4f33'];
+export const PALETTE = ['#fadaaa', '#f3a172', '#f7ece5', '#bbe2ea', '#f07d5d', '#89d6ce', '#f9f3c4', '#a7cb9c', '#ffbc3e'];
+const ROOF_OF = ['#d35339', '#bd4025', '#5a6f90', '#4e6383', '#cd442b', '#3c8d7d', '#d35339', '#5e854d', '#9b502d'];
 const WALLS = PALETTE.map((c) => new THREE.Color(c));
 const ROOFS = ROOF_OF.map((c) => new THREE.Color(c));
 const STONE = new THREE.Color('#b8a58a');
