@@ -1279,7 +1279,7 @@ const flashEl = document.getElementById('flash');
 // --- Orbit mode: after a while without input (or with O) the UI steps aside, the camera circles
 // the town and the time of day and weather move on by themselves. A press or key brings it back ---
 const ORBIT_AFTER = 30, ORBIT_STEP = 25; // idle seconds before it starts, seconds per time of day
-let orbiting = false, lastInput = now(), orbitNext = 0, gridWasOn = true, swallowUp = false;
+let orbiting = false, lastInput = now(), orbitNext = 0, gridWasOn = true, swallowUp = null;
 function setOrbit(on) {
   if (on === orbiting) return;
   orbiting = on;
@@ -1315,12 +1315,13 @@ for (const type of ['pointerdown', 'pointermove', 'wheel', 'keydown']) {
     if (!orbiting || type === 'pointermove') return;
     setOrbit(false);
     e.stopPropagation();
-    if (type === 'pointerdown') swallowUp = true;
+    if (type === 'pointerdown') swallowUp = e.pointerId;
   }, { capture: true });
 }
+// Only the release of the press that woke it: another finger's must still reach the camera
 addEventListener('pointerup', (e) => {
-  if (!swallowUp) return;
-  swallowUp = false;
+  if (e.pointerId !== swallowUp) return;
+  swallowUp = null;
   e.stopPropagation();
 }, { capture: true });
 // Coming back to a hidden tab is not the same as leaving it alone
@@ -1567,25 +1568,40 @@ document.addEventListener('wheel', (e) => {
   controls._rotateUp(-e.deltaY * k);
 }, { capture: true, passive: false });
 // Safari sends trackpad pinches as gesture events instead, and zooms the whole page unless stopped.
-// iOS sends them for touch pinches too, which OrbitControls already zooms from the touches
+// iOS sends them for touch pinches too: those are left alone, as OrbitControls zooms from the touches
 const fingers = new Set();
-addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') fingers.add(e.pointerId); }, { capture: true });
+addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;
+  // The first finger of a touch: a finger still on record lost its pointerup somewhere, and would
+  // turn every one-finger drag into a pinch
+  if (e.isPrimary) {
+    fingers.clear();
+    touchIds.clear();
+    controls._pointers.length = 0;
+  }
+  fingers.add(e.pointerId);
+}, { capture: true });
 for (const type of ['pointerup', 'pointercancel']) addEventListener(type, (e) => fingers.delete(e.pointerId), { capture: true });
 document.addEventListener('gesturestart', (e) => {
-  e.preventDefault();
   if (fingers.size) return;
+  e.preventDefault();
   lastInput = now();
   if (orbiting) setOrbit(false);
   pinching = true;
   pinchScale = 1;
 });
 document.addEventListener('gesturechange', (e) => {
+  if (!pinching) return;
   e.preventDefault();
-  if (!pinching || !e.scale) return;
+  if (!e.scale) return;
   controls._dollyOut(e.scale / pinchScale);
   pinchScale = e.scale;
 });
-document.addEventListener('gestureend', (e) => { e.preventDefault(); pinching = false; });
+document.addEventListener('gestureend', (e) => {
+  if (!pinching) return;
+  e.preventDefault();
+  pinching = false;
+});
 function syncScrollMode() {
   const el = document.getElementById('btn-scroll');
   el.textContent = { auto: 'Auto', orbit: 'Orbit', zoom: 'Zoom' }[scrollMode];

@@ -283,6 +283,11 @@ the original Townscaper.
 - 2026-09-30: phone pinch fix. iOS also sends gesture events for touch pinches, so the Safari
   pinch handler zoomed on top of OrbitControls and a pinch zoomed twice as far. Gesture events
   are now ignored while a finger is on the screen.
+- 2026-09-30: stuck fingers. When a finger's pointerup got lost, both the camera and the tap
+  handling kept it as still down, so one-finger drags zoomed and taps built nothing until reload.
+  The first finger of a new touch now clears any finger still on record. Waking the town from its
+  idle orbit swallows only the release of the press that woke it, not another finger's, and touch
+  pinches no longer have their gesture events cancelled.
 
 ## Refactor towards building styles
 
