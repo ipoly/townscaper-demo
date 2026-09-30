@@ -11,6 +11,8 @@ export const ring = (c2, r, sides, yaw = 0) =>
     return [c2[0] + Math.cos(ang) * r, c2[1] + Math.sin(ang) * r];
   });
 
+export const offset = (c2, ang, r) => [c2[0] + Math.cos(ang) * r, c2[1] + Math.sin(ang) * r];
+
 export class Emitter {
   // pivotOf(m) and cellOf(m) give the pop pivot and cell info ({ b, lit }) for a triangle's meta
   constructor(pivotOf, cellOf) {

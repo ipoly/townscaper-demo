@@ -293,3 +293,13 @@ step keeps the geometry byte for byte the same.
   outline / sway / shading flags, which used to be variables shared across the whole build closure.
   buildRecords destructures the tools, so call sites are unchanged. Snapshot identical; a full
   build takes the same time (about 185 ms for a 90-column town in Node).
+- 2026-09-30: step 3, parts. The building helpers left the build closure for town/parts/: props
+  (fountains, trees, fences, plants, bunting, lamps, benches, parasols, ducks, lily pads), landmarks
+  (cupola, clock tower, lighthouse top), roofs (eaves, dormers, walkway roofs), carry (posts,
+  brackets, joists, tie rods, undersides) and walls (wall face, occlusion bands, everything on a
+  wall). Each module is a factory taking the build context (emitter tools, town, verts, units,
+  infoOf) plus the parts made before it; the code moved verbatim with `this` becoming `town`.
+  emitQuad (the per-quad orchestrator with the roof slopes, spires and nooks) stays in town.js for
+  now: its locals are shared too tightly to split mechanically, so pieces come out when a style
+  needs them. town.js went from 2403 to 1324 lines. Snapshot identical; checked with ESLint
+  no-undef as well, since a missing import would only fail on the branch that uses it.
