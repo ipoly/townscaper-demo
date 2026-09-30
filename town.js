@@ -37,6 +37,9 @@ const GRASS = new THREE.Color('#9cc27a');
 const ROOF_FLAT = new THREE.Color('#a39a92');
 const GARDEN = new THREE.Color('#86b36a');
 const WINDOW = new THREE.Color('#3b4a5a');
+const GLINT = new THREE.Color('#7f98ad');
+const CURTAINS = ['#f4eee2', '#f6d9d2', '#e3eef0'].map((c) => new THREE.Color(c));
+const IVY = ['#4f8a45', '#5f9a4c', '#467d3e'].map((c) => new THREE.Color(c));
 const WHITE = new THREE.Color('#f7f4ee');
 const BRICK = new THREE.Color('#8a5a4a');
 const TRUNK = new THREE.Color('#7a5a40');
@@ -801,7 +804,7 @@ export class Town {
       const n = [nx / len, ny / len, nz / len];
       const pv = this.pivot(m.v, m.L);
       const cell = m.pond ?? infoOf(m.v, m.L).info;
-      const glow = color === LAMP ? 1 : color === WINDOW ? cell.lit : 0;
+      const glow = color === LAMP ? 1 : color === WINDOW || color === GLINT || CURTAINS.includes(color) ? cell.lit : 0;
       for (const p of [a, b, c]) {
         R.position.push(p[0], p[1], p[2]);
         R.normal.push(n[0], n[1], n[2]);
@@ -1487,11 +1490,37 @@ export class Town {
         const c0 = p3(at(tm(0), off), yc);
         for (let k = 0; k < 6; k++) tri(c0, pt(a0 + ((a1 - a0) * k) / 6), pt(a0 + ((a1 - a0) * (k + 1)) / 6), towards, c, m);
       };
+      // Glass reflects the sky: panes brighten towards the top
+      const skyGlass = (yA, yB) => { shadeFn = (pt) => 1 + 0.6 * Math.max(0, Math.min(1, (pt[1] - yA) / (yB - yA))); };
+      // Signed distance from the face center along a fixed world direction, so both halves agree
+      const side = (() => { const d = [b[0] - a[0], b[1] - a[1]]; return d[0] * -towards[2] + d[1] * towards[0] > 0 === aIsM ? 1 : -1; })();
+      // Diagonal glint on one side of a pane, x in world units from the face center
+      const glint = (yA, yT) => {
+        const H = yT - yA;
+        for (const [x0, wd, t0] of [[-0.12, 0.03, 0.35], [-0.065, 0.014, 0.55]]) {
+          const pt = (x, y) => p3(at(tm(Math.max(0, x * side) / len), 0.014), y);
+          const yb = yA + H * t0, yt = yT - 0.02, dx = (yt - yb) * 0.25;
+          if (Math.min(x0 * side, (x0 + wd + dx) * side) < 0) continue; // the other half draws it
+          quad(pt(x0, yb), pt(x0 + wd, yb), pt(x0 + wd + dx, yt), pt(x0 + dx, yt), towards, GLINT, m);
+        }
+      };
+      // Curtain gathered at the outer edge of a pane, tied back halfway down
+      const curtain = (hw, yA, yT, c) => {
+        const w = U(hw), yM = yA + (yT - yA) * 0.45;
+        const pt = (u, y) => p3(at(tm(u), 0.015), y);
+        quad(pt(w - U(0.06), yT), pt(w, yT), pt(w, yM), pt(w - U(0.02), yM), towards, c, m);
+        quad(pt(w - U(0.02), yM), pt(w, yM), pt(w, yA + 0.02), pt(w - U(0.035), yA + 0.02), towards, c, m);
+      };
       // Big window with a chunky frame, optionally round-arched; hw is its half width
-      const window1 = (hw, h0, h1, round = false) => {
+      const window1 = (hw, h0, h1, round = false, drape = null) => {
         const w = U(hw), f = U(FRAME), yA = y0 + h0, yB = y0 + h1;
         const ys = round ? yB - hw : yB; // springline of the arch
+        skyGlass(yA, yB);
         rect(tm(0), tm(w), h0, ys - y0, WINDOW, 0.004);
+        if (round) fan(ys, hw, 0, Math.PI / 2, 0.012, WINDOW);
+        shadeFn = null;
+        glint(yA, round ? ys + 0.04 : yB);
+        if (drape) curtain(hw, yA, ys, drape);
         slab(w, w + f, 0.035, yA, ys, WHITE);
         slab(0, w + f + U(0.02), 0.06, yA - FRAME, yA, WHITE); // sill
         if (!round) {
@@ -1499,12 +1528,13 @@ export class Town {
           return;
         }
         fan(ys, hw + FRAME, 0, Math.PI / 2, 0.008, WHITE);
-        fan(ys, hw, 0, Math.PI / 2, 0.012, WINDOW);
       };
       // Round window: this half draws its half disc
       const porthole = (r, hc) => {
         fan(y0 + hc, r + FRAME, -Math.PI / 2, Math.PI / 2, 0.008, WHITE);
+        skyGlass(y0 + hc - r, y0 + hc + r);
         fan(y0 + hc, r, -Math.PI / 2, Math.PI / 2, 0.012, WINDOW);
+        shadeFn = null;
       };
       // Flower box hanging under a window's sill: this half fills u = 0..uw
       const flowerBox = (uw, yS, seed) => {
@@ -1636,13 +1666,24 @@ export class Town {
           blob([pos[0], y0 + r * 0.7, pos[1]], r, 0.9, leaf, m);
         }
       }
+      // Ivy climbing from the foot of some ground-floor walls, away from the window
+      if (L === 1 && aIsM && hash(v, target, 19) < 0.22) {
+        const leaf = pickFrom(IVY, hash(v, target, 20)), top = this.has(v, 2) ? 0.95 : 0.6;
+        for (let k = 0; k < 30; k++) {
+          const t = Math.pow(hash(v, target, 21 + k), 1.5), spread = 0.03 + 0.12 * (1 - t);
+          const u = Math.min(0.95, 0.72 + U((hash(v, target, 61 + k) - 0.5) * 2 * spread));
+          const pos = at(tm(u), 0.025);
+          blob([pos[0], y0 + 0.035 + t * top, pos[1]], 0.05 - 0.02 * t, 0.85, leaf, m);
+        }
+      }
       if (h < 0.1) return; // blank wall
+      const drape = (k) => (hash(v, L, target, 23) < k ? pickFrom(CURTAINS, hash(v, L, target, 24)) : null);
       if (h < 0.42) {
-        window1(0.15, 0.21, 0.57);
+        window1(0.15, 0.21, 0.57, false, drape(0.4));
         const fb = hash(v, L, target, 17);
         if (fb < 0.45) flowerBox(U(0.15) + U(FRAME) + U(0.02), y0 + 0.21 - FRAME, fb / 0.45);
       } else if (h < 0.62) {
-        window1(0.14, 0.19, 0.59, true);
+        window1(0.14, 0.19, 0.59, true, drape(0.3));
       } else if (h < 0.76) {
         const sc = pickFrom(SHUTTERS, hash(v, L, 11)), w = U(0.13) + U(0.045);
         window1(0.13, 0.23, 0.55);

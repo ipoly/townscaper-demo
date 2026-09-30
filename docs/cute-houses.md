@@ -50,6 +50,12 @@ the original Townscaper.
 - [x] Small bushes at the foot of plaza-facing walls
 - [x] Gold finials on the apex of lone pointed roofs
 
+### Phase 6: window and wall charm
+
+- [x] Glass with a sky gradient and slanted glints
+- [x] Tied-back curtains in some windows
+- [x] Ivy climbing some ground-floor walls
+
 ## Progress log
 
 - 2026-09-30: diagnosis done; starting phase 1 items 1-3.
@@ -105,3 +111,11 @@ the original Townscaper.
  - `ridgeCap()` now builds one profile per point instead of one frame per segment. Interior points
    use the averaged direction and are stretched along the bend onto the mitre plane, so the roof and
    eave segments of a hip share their joint ring and the cap no longer narrows or steps there.
+- 2026-09-30: phase 6 done.
+ - Glass: `skyGlass()` brightens panes towards the top through `shadeFn`; `glint()` adds two slanted
+   `GLINT` strips on one world-consistent side of each window (plain, arched). Portholes get the
+   gradient only. Glints and curtains glow with the window at night.
+ - Curtains: ~40% of the plain and ~30% of the arched windows get tied-back `CURTAINS` drapes at both
+   outer pane edges.
+ - Ivy: ~22% of the outer ground-floor walls get a patch of `IVY` leaf blobs near one corner, wide at
+   the foot and narrowing upwards, reaching into the next floor when there is one.
