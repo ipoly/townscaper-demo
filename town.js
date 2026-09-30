@@ -12,7 +12,7 @@ import * as THREE from 'three';
 export const MAX_LEVEL = 10;
 const BASE_BOTTOM = -0.4;
 const BASE_TOP = 0.3;
-const LEVEL_H = 0.85;
+const LEVEL_H = 0.75;
 const ROOF_RISE = 0.6;
 const EAVE = 0.09; // how far roofs overhang the walls
 const EAVE_DROP = 0.07;
@@ -1465,7 +1465,7 @@ export class Town {
         }
         if (s < 0.55) {
           // Arcade: an arched opening between pillars
-          const u0 = 0.14, u1 = 0.84, top = 0.5;
+          const u0 = 0.14, u1 = 0.84, top = 0.46;
           rect(tm(u0), tm(u1), 0, top, SHADOW);
           const mid = (u0 + u1) / 2, r = (u1 - u0) / 2;
           for (let k = 0; k < 6; k++) {
@@ -1478,7 +1478,7 @@ export class Town {
       }
       if (L >= 2 && this.has(target, L - 1) && !this.has(target, L) && infoOf(target, L - 1).info.tr) {
         // French door out onto the neighbour's roof terrace
-        window1(0.14, 0.03, 0.62);
+        window1(0.14, 0.03, 0.57);
         return;
       }
       if (L === 2 && this.hasStair(v, target) && !aIsM) {
@@ -1493,18 +1493,18 @@ export class Town {
       }
       if (h < 0.1) return; // blank wall
       if (h < 0.42) {
-        window1(0.15, 0.24, 0.62);
+        window1(0.15, 0.21, 0.57);
       } else if (h < 0.62) {
-        window1(0.14, 0.22, 0.64, true);
+        window1(0.14, 0.19, 0.59, true);
       } else if (h < 0.76) {
         const sc = pickFrom(SHUTTERS, hash(v, L, 11)), w = U(0.13) + U(0.045);
-        window1(0.13, 0.26, 0.6);
-        slab(w + U(0.015), w + U(0.12), 0.02, y0 + 0.25, y0 + 0.61, sc);
+        window1(0.13, 0.23, 0.55);
+        slab(w + U(0.015), w + U(0.12), 0.02, y0 + 0.22, y0 + 0.56, sc);
       } else if (h < 0.86 && L >= 2) {
         // Balcony: French window, thick slab on brackets, balustrade, sometimes a pot
         const iron = hash(v, L, target, 13) < 0.45;
         const rc = iron ? SLATE : WHITE, d = 0.2, w = U(0.3);
-        window1(0.13, 0.04, 0.62);
+        window1(0.13, 0.04, 0.57);
         slab(0, w, d, y0 - 0.02, y0 + 0.035, WHITE);
         slab(U(0.17), U(0.22), d * 0.6, y0 - 0.14, y0 - 0.02, WHITE);
         const yr = y0 + 0.24, dir = dirAlong();
@@ -1520,7 +1520,7 @@ export class Town {
           blob([pos[0], y0 + 0.16, pos[1]], 0.06, 1, pickFrom(BLOOMS, hash(v, L, target, 16)), m);
         }
       } else {
-        porthole(0.12, 0.44);
+        porthole(0.12, 0.4);
       }
     };
 
