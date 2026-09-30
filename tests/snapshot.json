@@ -1,0 +1,50 @@
+{
+ "showcase": {
+  "hash": "a9d3e5b8abe91f4b",
+  "tris": 53000
+ },
+ "starter": {
+  "hash": "39f04ad37a2804b7",
+  "tris": 2716
+ },
+ "seed1": {
+  "hash": "9d4933d609437d7f",
+  "tris": 21409
+ },
+ "seed7": {
+  "hash": "1aa11e0a87bc7272",
+  "tris": 18753
+ },
+ "seed2024": {
+  "hash": "a2056ae09d400634",
+  "tris": 20454
+ },
+ "seed99991": {
+  "hash": "3432fb51daae9a50",
+  "tris": 16400
+ },
+ "fuzz11": {
+  "hash": "b5d906dbf03ca820",
+  "tris": 63795
+ },
+ "fuzz11-edited": {
+  "hash": "9f2bba087ed6c41e",
+  "tris": 60033
+ },
+ "fuzz12": {
+  "hash": "3b5925cf5f23fec2",
+  "tris": 62363
+ },
+ "fuzz12-edited": {
+  "hash": "a8cf176fcc7519f6",
+  "tris": 64390
+ },
+ "fuzz13": {
+  "hash": "c181a781f7bec5be",
+  "tris": 63666
+ },
+ "fuzz13-edited": {
+  "hash": "9437a2551bb92c48",
+  "tris": 61335
+ }
+}

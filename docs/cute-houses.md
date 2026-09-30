@@ -274,3 +274,16 @@ the original Townscaper.
   color like its swatch (a small color wheel for auto), and it changes as colors are picked. Holding
   Shift turns it into a red eraser ring, dragging the view shows a grabbing hand and orbit mode shows
   a faint ring. They are native SVG cursors, with 2x images for sharp screens, so they never lag.
+
+## Refactor towards building styles
+
+Plan: split the geometry code into an emitter (low-level drawing), parts (roofs, walls, carrying,
+street, water, landmarks) and style kits (palette plus the few pieces a style draws its own way),
+so that a second style, Chinese first, is a new kit rather than branches all over town.js. Every
+step keeps the geometry byte for byte the same.
+
+- 2026-09-30: a geometry snapshot test. `node tests/snapshot.mjs` builds the showcase, starter and
+  four seeded towns (captured from the app into tests/fixtures.json) plus three random stress towns
+  with edits rebuilt incrementally, and compares a fingerprint of every vertex attribute, outline
+  and effect list with tests/snapshot.json (`--update` records a new baseline). It runs in about a
+  second and a 0.0001 change to the eave overhang fails every town.

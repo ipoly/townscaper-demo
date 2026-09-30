@@ -1785,5 +1785,5 @@ if ('serviceWorker' in navigator) {
 
 window.__debug = {
   get town() { return town; }, get grid() { return grid; }, rebuild, MAX_LEVEL,
-  undo, redo, setMood, setRain, setOrbit, starter: () => newWorld(42, starterTown), encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
+  undo, redo, setMood, setRain, setOrbit, starter: () => newWorld(42, starterTown), world: (s) => newWorld(s), encodeTown, showcase: (only) => newWorld(42, (s) => showcaseTown(s, only)), camera, controls, sfx, frame: () => renderer.info.render.frame, get undoDepth() { return undoStack.length; },
 };
