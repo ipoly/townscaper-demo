@@ -196,3 +196,8 @@ the original Townscaper.
  - Lit windows get a soft rounded glow quad just off the wall, and box lamps get a glowing sprite. Both
    are additive, fade in with `uNight`, and are hidden by day.
  - This replaces bloom without any full-screen pass: one small mesh and one point set, rebuilt with the town.
+- 2026-09-30: dawn.
+ - A fourth mood after night: cool pastel light (lavender sky, peach sun low on the side opposite dusk),
+   pearly water, a nearer fog for morning mist, and lit windows at a faint 15% glow.
+ - Fog near and far are now part of each mood and blend with it (default 30 and 70).
+ - The dusk icon is now a setting sun; dawn uses the rising sun.

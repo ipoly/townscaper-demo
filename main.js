@@ -134,20 +134,23 @@ const townDepthMaterial = withPop(new THREE.MeshDepthMaterial({ depthPacking: TH
 const outlineMaterial = withPop(new THREE.LineBasicMaterial({ color: '#6b5446', transparent: true, opacity: 0.3 }));
 const ghostMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45, depthWrite: false });
 
-// --- Day / dusk / night ---
+// --- Day / dusk / night / dawn ---
 const MOODS = [
   { name: 'Day', bg: '#cfe6ec', sky: '#fff6e8', ground: '#a89c8a', hemi: 1.4, sun: '#fff1d6', sunI: 2.2, sunPos: [12, 20, 8], water: '#5aa6c4', night: 0, exp: 1.3 },
   { name: 'Dusk', bg: '#f0b48e', sky: '#ffd0a8', ground: '#5a6f8f', hemi: 1.0, sun: '#ff9458', sunI: 1.7, sunPos: [20, 6, 2], water: '#6b8fb2', night: 0.45, exp: 1.2 },
   { name: 'Night', bg: '#1c2744', sky: '#8492c4', ground: '#26324c', hemi: 1.0, sun: '#aabcff', sunI: 0.7, sunPos: [-10, 18, -6], water: '#1f3654', night: 1, exp: 0.95 },
+  // Cool pastel light from the side opposite dusk, a thin mist and a few windows still lit
+  { name: 'Dawn', bg: '#e6d4de', sky: '#f2e2f2', ground: '#8a90ad', hemi: 1.25, sun: '#ffc6a0', sunI: 1.5, sunPos: [-18, 6, 6], water: '#8fb2c9', night: 0.15, exp: 1.25, fog: [16, 55] },
 ];
+const FOG = [30, 70];
 let moodIndex = 0, moodFrom = null, moodStart = 0;
 renderer.toneMappingExposure = MOODS[0].exp;
 const moodTo = {
-  bg: new THREE.Color(), sky: new THREE.Color(), ground: new THREE.Color(), sun: new THREE.Color(), water: new THREE.Color(),
+  fog: new THREE.Vector2(), bg: new THREE.Color(), sky: new THREE.Color(), ground: new THREE.Color(), sun: new THREE.Color(), water: new THREE.Color(),
   sunPos: new THREE.Vector3(),
 };
 const snapshotMood = () => ({
-  bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
+  fog: new THREE.Vector2(scene.fog.near, scene.fog.far), bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
   water: waterMaterial.color.clone(), hemi: hemi.intensity, sunI: sun.intensity, sunPos: sun.position.clone(), night: uNight.value, exp: renderer.toneMappingExposure,
 });
 function setMood(i) {
@@ -166,6 +169,9 @@ function updateMood(t) {
   const to = MOODS[moodIndex];
   scene.background.copy(moodFrom.bg).lerp(moodTo.bg.set(to.bg), e);
   scene.fog.color.copy(scene.background);
+  moodTo.fog.fromArray(to.fog ?? FOG).lerp(moodFrom.fog, 1 - e);
+  scene.fog.near = moodTo.fog.x;
+  scene.fog.far = moodTo.fog.y;
   hemi.color.copy(moodFrom.sky).lerp(moodTo.sky.set(to.sky), e);
   hemi.groundColor.copy(moodFrom.ground).lerp(moodTo.ground.set(to.ground), e);
   sun.color.copy(moodFrom.sun).lerp(moodTo.sun.set(to.sun), e);
