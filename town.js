@@ -1500,7 +1500,7 @@ export class Town {
       nx /= len; nz /= len;
       if (nx * towards[0] + nz * towards[2] < 0) { nx = -nx; nz = -nz; }
       const at = (t, off) => { const p = lerp2(a, b, t); return [p[0] + nx * off, p[1] + nz * off]; };
-      const tm = (u) => (aIsM ? u : 1 - u); // u = 0 at the edge midpoint, 1 at the quad center
+      let tm = (u) => (aIsM ? u : 1 - u); // u = 0 at the edge midpoint, 1 at the quad center
       const rect = (t0, t1, h0, h1, c, off = 0.01) =>
         quad(p3(at(t0, off), y0 + h0), p3(at(t1, off), y0 + h0), p3(at(t1, off), y0 + h1), p3(at(t0, off), y0 + h1), towards, c, m);
       // Solid block against the wall: footprint u0..u1 along it, reaching out to depth d
@@ -1513,6 +1513,19 @@ export class Town {
         quad(p3(s1, yA), p3(e1, yA), p3(e1, yB), p3(s1, yB), along, c, m);
       };
       const dirAlong = () => { const d = [b[0] - a[0], b[1] - a[1]]; const dl = Math.hypot(d[0], d[1]) || 1; return [d[0] / dl, d[1] / dl]; };
+      // Where the face bends sharply at the edge midpoint a window centered there would fold,
+      // so each half gets its own, sized to fit the shorter half. Returns its max half width.
+      const splitWidth = () => {
+        const mid = aIsM ? a : b, qc = aIsM ? b : a;
+        const centers = this.vertexQuads[v].filter((qq) => qq.includes(target)).map((qq) =>
+          [qq.reduce((s, u) => s + verts[u][0], 0) / 4, qq.reduce((s, u) => s + verts[u][1], 0) / 4]);
+        const other = centers.find((c) => Math.hypot(c[0] - qc[0], c[1] - qc[1]) > 1e-6);
+        if (!other) return 0;
+        const d1 = [mid[0] - qc[0], mid[1] - qc[1]], d2 = [other[0] - mid[0], other[1] - mid[1]];
+        const l2 = Math.hypot(d2[0], d2[1]);
+        if ((d1[0] * d2[0] + d1[1] * d2[1]) / (len * l2) > Math.cos(0.35)) return 0;
+        return Math.max(0.08, Math.min(len, l2) / 2 - 0.06);
+      };
 
       if (L === 0) {
         // Foam ring where the foundation meets the water, posts under docks
@@ -1689,6 +1702,11 @@ export class Town {
         window1(0.14, 0.03, 0.57);
         return;
       }
+      // A lower neighbour's pitched roof rises against this wall and would bury the window
+      if (L >= 2 && this.has(target, L - 1) && !this.has(target, L)) {
+        const T = infoOf(target, L - 1).info;
+        if (T.t && !T.br && !T.cv && T.r > 0) return;
+      }
       if (L === 2 && this.hasStair(v, target) && !aIsM) {
         // Door on the landing at the top of the staircase
         door(0.6, 0.9, pickFrom(DOORS, hash(v, target, 3)));
@@ -1732,8 +1750,9 @@ export class Town {
           blob([pos[0], y0 + r * 0.7, pos[1]], r, 0.9, leaf, m);
         }
       }
+      const sw = h < 0.1 ? 0 : splitWidth();
       // Ivy climbing from the foot of some ground-floor walls, away from the window
-      if (L === 1 && aIsM && hash(v, target, 19) < 0.22) {
+      if (L === 1 && aIsM && !sw && hash(v, target, 19) < 0.22) {
         const leaf = pickFrom(IVY, hash(v, target, 20)), top = this.has(v, 2) ? 0.95 : 0.6;
         for (let k = 0; k < 30; k++) {
           const t = Math.pow(hash(v, target, 21 + k), 1.5), spread = 0.03 + 0.12 * (1 - t);
@@ -1744,6 +1763,22 @@ export class Town {
       }
       if (h < 0.1) return; // blank wall
       const drape = (k) => (hash(v, L, target, 23) < k ? pickFrom(CURTAINS, hash(v, L, target, 24)) : null);
+      if (sw) {
+        // A window per half, drawn from its center outwards to both sides; shutters and
+        // balconies need the whole face, so those become plain windows
+        const base = tm, fit = (x) => Math.min(x, sw - FRAME), fb = hash(v, L, target, 17);
+        for (const s of [1, -1]) {
+          tm = (u) => base(0.5 + s * u);
+          if (h < 0.42) {
+            window1(fit(0.15), 0.21, 0.57, false, drape(0.4));
+            if (fb < 0.45) flowerBox(U(fit(0.15)) + U(FRAME) + U(0.02), y0 + 0.21 - FRAME, fb / 0.45);
+          } else if (h < 0.62) window1(fit(0.14), 0.19, 0.59, true, drape(0.3));
+          else if (h < 0.86 && (h < 0.76 || L >= 2)) window1(fit(0.14), 0.21, 0.57);
+          else porthole(fit(0.12), 0.4);
+        }
+        tm = base;
+        return;
+      }
       if (h < 0.42) {
         window1(0.15, 0.21, 0.57, false, drape(0.4));
         const fb = hash(v, L, target, 17);

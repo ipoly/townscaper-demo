@@ -149,3 +149,12 @@ the original Townscaper.
    a backrest on square and courtyard cells, and less often on small plaza cells.
  - The nook bunting and laundry and the landing lamps already existed; these add the street and
    plaza versions.
+- 2026-09-30: leftovers fixed.
+ - Bent faces: where the two halves of a face meet at more than ~20 degrees, `splitWidth()` makes each
+   half draw its own window centered on it (sized to the shorter half) instead of one window folding
+   across the edge midpoint. Shutters and balconies need the whole face, so they become plain windows
+   there; ivy skips these walls. About a tenth to a quarter of the faces bend that much.
+ - Lean-to roofs: a wall with a lower neighbour's pitched roof rising against it stays blank, so no
+   window is half buried under the roof.
+ - Walkway and dock corners stay square on purpose: plank piers and railed walkways read as built
+   timber. (Ground-floor corners already round off since phase 2.)
