@@ -179,3 +179,10 @@ the original Townscaper.
    first; it read darker than the walls and looked like a roof color.)
  - Swatches keep the daytime look at dusk and night.
 - 2026-09-30: app icon recolored with two of the new pairs (mint / navy, apricot / brick).
+- 2026-09-30: brighter, more vivid look.
+ - Tone mapping: ACES Filmic -> Khronos PBR Neutral, which keeps the palette's hue and saturation and
+   only rolls off the brightest light (ACES greyed and darkened every surface; AgX was greyer still).
+ - Exposure is now per mood and blends with it: day 1.3, dusk 1.2, night 0.95.
+ - The hemisphere ground light is a warm grey (`#a89c8a`) instead of blue-grey, so shaded walls stay warm.
+ - Soft bloom was tried and dropped: it mostly showed on lit windows at night and cost several extra
+   full-screen passes per frame on phones.

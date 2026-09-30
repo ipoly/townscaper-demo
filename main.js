@@ -9,7 +9,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// Neutral keeps the palette's hues and saturation and only rolls off the brightest light
+renderer.toneMapping = THREE.NeutralToneMapping;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -26,7 +27,7 @@ controls.maxPolarAngle = Math.PI * 0.45;
 controls.minDistance = 6;
 controls.maxDistance = 50;
 
-const hemi = new THREE.HemisphereLight('#fff6e8', '#6a8fa0', 1.4);
+const hemi = new THREE.HemisphereLight('#fff6e8', '#a89c8a', 1.4);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff1d6', 2.2);
 sun.position.set(12, 20, 8);
@@ -118,18 +119,19 @@ const ghostMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparen
 
 // --- Day / dusk / night ---
 const MOODS = [
-  { name: 'Day', bg: '#cfe6ec', sky: '#fff6e8', ground: '#6a8fa0', hemi: 1.4, sun: '#fff1d6', sunI: 2.2, sunPos: [12, 20, 8], water: '#5aa6c4', night: 0 },
-  { name: 'Dusk', bg: '#f0b48e', sky: '#ffd0a8', ground: '#5a6f8f', hemi: 1.0, sun: '#ff9458', sunI: 1.7, sunPos: [20, 6, 2], water: '#6b8fb2', night: 0.45 },
-  { name: 'Night', bg: '#1c2744', sky: '#8492c4', ground: '#26324c', hemi: 1.0, sun: '#aabcff', sunI: 0.7, sunPos: [-10, 18, -6], water: '#1f3654', night: 1 },
+  { name: 'Day', bg: '#cfe6ec', sky: '#fff6e8', ground: '#a89c8a', hemi: 1.4, sun: '#fff1d6', sunI: 2.2, sunPos: [12, 20, 8], water: '#5aa6c4', night: 0, exp: 1.3 },
+  { name: 'Dusk', bg: '#f0b48e', sky: '#ffd0a8', ground: '#5a6f8f', hemi: 1.0, sun: '#ff9458', sunI: 1.7, sunPos: [20, 6, 2], water: '#6b8fb2', night: 0.45, exp: 1.2 },
+  { name: 'Night', bg: '#1c2744', sky: '#8492c4', ground: '#26324c', hemi: 1.0, sun: '#aabcff', sunI: 0.7, sunPos: [-10, 18, -6], water: '#1f3654', night: 1, exp: 0.95 },
 ];
 let moodIndex = 0, moodFrom = null, moodStart = 0;
+renderer.toneMappingExposure = MOODS[0].exp;
 const moodTo = {
   bg: new THREE.Color(), sky: new THREE.Color(), ground: new THREE.Color(), sun: new THREE.Color(), water: new THREE.Color(),
   sunPos: new THREE.Vector3(),
 };
 const snapshotMood = () => ({
   bg: scene.background.clone(), sky: hemi.color.clone(), ground: hemi.groundColor.clone(), sun: sun.color.clone(),
-  water: waterMaterial.color.clone(), hemi: hemi.intensity, sunI: sun.intensity, sunPos: sun.position.clone(), night: uNight.value,
+  water: waterMaterial.color.clone(), hemi: hemi.intensity, sunI: sun.intensity, sunPos: sun.position.clone(), night: uNight.value, exp: renderer.toneMappingExposure,
 });
 function setMood(i) {
   moodFrom = snapshotMood();
@@ -155,6 +157,7 @@ function updateMood(t) {
   sun.intensity = THREE.MathUtils.lerp(moodFrom.sunI, to.sunI, e);
   sun.position.copy(moodFrom.sunPos).lerp(moodTo.sunPos.fromArray(to.sunPos), e);
   uNight.value = THREE.MathUtils.lerp(moodFrom.night, to.night, e);
+  renderer.toneMappingExposure = THREE.MathUtils.lerp(moodFrom.exp, to.exp, e);
   starMaterial.opacity = Math.max(0, uNight.value - 0.4) / 0.6;
   if (k >= 1) moodFrom = null;
 }
